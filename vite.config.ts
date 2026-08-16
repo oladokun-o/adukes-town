@@ -8,6 +8,11 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
+  build: {
+    // Phaser alone minifies to ~1.3MB; the default 500kB warning threshold
+    // fires on every build regardless of our own code size.
+    chunkSizeWarningLimit: 1600,
+  },
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
