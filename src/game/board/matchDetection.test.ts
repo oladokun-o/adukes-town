@@ -56,6 +56,15 @@ describe("findMatches", () => {
     expect(matches[0].positions).toHaveLength(5);
   });
 
+  it("reports a single unmerged run's positions in `runs`", () => {
+    const board = buildBoard([["Red", "Red", "Red", "Red"]]);
+
+    const matches = findMatches(board);
+
+    expect(matches[0].runs).toHaveLength(1);
+    expect(sortPositions(matches[0].runs[0])).toEqual(sortPositions(matches[0].positions));
+  });
+
   it("merges a row-run and a column-run that share a cell into one match", () => {
     const board = buildBoard([
       ["Red", "Red", "Red"],
@@ -73,6 +82,7 @@ describe("findMatches", () => {
       { row: 1, col: 1 },
       { row: 2, col: 1 },
     ]);
+    expect(matches[0].runs).toHaveLength(2);
   });
 
   it("returns no matches when no run reaches length 3", () => {

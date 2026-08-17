@@ -1,8 +1,14 @@
 import Phaser from "phaser";
-import { PIECE_TYPES, type PieceType } from "@/game/board/types";
+import { PIECE_TYPES, type Piece, type PieceType } from "@/game/board/types";
 
-export function pieceTextureKey(type: PieceType): string {
-  return `piece-${type}`;
+export function pieceTextureKey(piece: Piece): string {
+  if (piece.special === "Rocket") {
+    return `special-Rocket-${piece.specialAxis ?? "row"}`;
+  }
+  if (piece.special) {
+    return `special-${piece.special}`;
+  }
+  return `piece-${piece.type}`;
 }
 
 const PIECE_COLORS: Record<PieceType, number> = {
@@ -48,16 +54,82 @@ const PIECE_SHAPES: Record<PieceType, (g: Phaser.GameObjects.Graphics, r: number
   },
 };
 
+// Two overlapping triangles pointing outward along the clear axis — reads as
+// a bar/arrow without needing real art.
+function drawRocket(g: Phaser.GameObjects.Graphics, r: number, axis: "row" | "col"): void {
+  g.fillStyle(0xecf0f1, 1);
+  if (axis === "row") {
+    g.fillTriangle(r * 0.1, r, r * 0.7, r * 0.25, r * 0.7, r * 1.75);
+    g.fillTriangle(r * 1.9, r, r * 1.3, r * 0.25, r * 1.3, r * 1.75);
+  } else {
+    g.fillTriangle(r, r * 0.1, r * 0.25, r * 0.7, r * 1.75, r * 0.7);
+    g.fillTriangle(r, r * 1.9, r * 0.25, r * 1.3, r * 1.75, r * 1.3);
+  }
+}
+
+// Dark core with an explosion-spike ring — colorless so it doesn't read as
+// one of the five match colors.
+function drawBomb(g: Phaser.GameObjects.Graphics, r: number): void {
+  g.fillStyle(0x2c3e50, 1);
+  g.fillCircle(r, r, r * 0.75);
+
+  g.fillStyle(0xe67e22, 1);
+  const spikes = 8;
+  for (let i = 0; i < spikes; i++) {
+    const angle = (Math.PI * 2 * i) / spikes;
+    const x1 = r + Math.cos(angle) * r * 0.75;
+    const y1 = r + Math.sin(angle) * r * 0.75;
+    const x2 = r + Math.cos(angle) * r * 1.15;
+    const y2 = r + Math.sin(angle) * r * 1.15;
+    const perpAngle = angle + Math.PI / 2;
+    const wx = Math.cos(perpAngle) * r * 0.12;
+    const wy = Math.sin(perpAngle) * r * 0.12;
+    g.fillTriangle(x1 - wx, y1 - wy, x1 + wx, y1 + wy, x2, y2);
+  }
+}
+
+// A wedge per match color, so it visually carries "clears one of every
+// color" without needing a literal rainbow gradient.
+function drawRainbowBall(g: Phaser.GameObjects.Graphics, r: number): void {
+  const colors = PIECE_TYPES.map((type) => PIECE_COLORS[type]);
+  const slices = colors.length;
+  for (let i = 0; i < slices; i++) {
+    const startAngle = (Math.PI * 2 * i) / slices - Math.PI / 2;
+    const endAngle = (Math.PI * 2 * (i + 1)) / slices - Math.PI / 2;
+    g.fillStyle(colors[i], 1);
+    g.beginPath();
+    g.moveTo(r, r);
+    g.arc(r, r, r * 0.85, startAngle, endAngle);
+    g.closePath();
+    g.fillPath();
+  }
+}
+
 // Generated once per size and cached on the texture manager so re-entering
 // BoardScene (or any future scene) doesn't regenerate them.
 export function ensurePieceTextures(scene: Phaser.Scene, size: number): void {
   for (const type of PIECE_TYPES) {
-    const key = pieceTextureKey(type);
+    const key = `piece-${type}`;
     if (scene.textures.exists(key)) continue;
 
     const graphics = scene.add.graphics();
     graphics.fillStyle(PIECE_COLORS[type], 1);
     PIECE_SHAPES[type](graphics, size / 2);
+    graphics.generateTexture(key, size, size);
+    graphics.destroy();
+  }
+
+  const specialDrawers: Record<string, (g: Phaser.GameObjects.Graphics, r: number) => void> = {
+    "special-Rocket-row": (g, r) => drawRocket(g, r, "row"),
+    "special-Rocket-col": (g, r) => drawRocket(g, r, "col"),
+    "special-Bomb": drawBomb,
+    "special-RainbowBall": drawRainbowBall,
+  };
+
+  for (const [key, draw] of Object.entries(specialDrawers)) {
+    if (scene.textures.exists(key)) continue;
+    const graphics = scene.add.graphics();
+    draw(graphics, size / 2);
     graphics.generateTexture(key, size, size);
     graphics.destroy();
   }

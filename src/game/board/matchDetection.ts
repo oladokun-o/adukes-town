@@ -26,9 +26,10 @@ function scanLine(board: Board, line: Position[]): Position[][] {
 }
 
 // Runs that share a cell (e.g. a row-run crossing a column-run) describe one
-// physical match shape, so they're unioned into a single Match here. This is
-// what lets a later milestone tell straight lines apart from L/T shapes by
-// inspecting the merged positions, without matchDetection knowing about that.
+// physical match shape, so they're unioned into a single Match here. The
+// contributing runs are preserved on the result so callers (see
+// `specials.ts`) can tell a straight line apart from an L/T shape without
+// matchDetection itself knowing what that distinction is for.
 function mergeRuns(runs: Position[][]): Match[] {
   const parent = new Map<string, string>();
   const posByKey = new Map<string, Position>();
@@ -73,7 +74,18 @@ function mergeRuns(runs: Position[][]): Match[] {
     groups.set(root, group);
   }
 
-  return Array.from(groups.values()).map((positions) => ({ positions }));
+  const runsByRoot = new Map<string, Position[][]>();
+  for (const run of runs) {
+    const root = find(positionKey(run[0]));
+    const list = runsByRoot.get(root) ?? [];
+    list.push(run);
+    runsByRoot.set(root, list);
+  }
+
+  return Array.from(groups.entries()).map(([root, positions]) => ({
+    positions,
+    runs: runsByRoot.get(root) ?? [],
+  }));
 }
 
 export function findMatches(board: Board): Match[] {

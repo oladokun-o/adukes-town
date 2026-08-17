@@ -3,7 +3,14 @@ import { Board } from "@/game/board/Board";
 import { resolveCascade } from "@/game/board/cascade";
 import { hasValidMove, reshuffleUntilSolvable } from "@/game/board/noDeadEnd";
 import { trySwap } from "@/game/board/swap";
-import type { CascadeStep, Piece, PieceType, Position, SpawnedPiece } from "@/game/board/types";
+import type {
+  CascadeStep,
+  FallMovement,
+  Piece,
+  PieceType,
+  Position,
+  SpawnedPiece,
+} from "@/game/board/types";
 import { emitGameEvent, GameEvents, offGameEvent, onGameEvent } from "@/game/events";
 import { getLevelById } from "@/game/levels";
 import { clearProgress, getStoredProgress, storeProgress } from "@/game/levels/progress";
@@ -16,6 +23,8 @@ const BOARD_MARGIN = 0.9;
 const PIECE_SCALE = 0.86;
 const SWAP_DURATION_MS = 150;
 const CLEAR_DURATION_MS = 150;
+const SPECIAL_CLEAR_DURATION_MS = 320;
+const CREATE_DURATION_MS = 220;
 const FALL_DURATION_MS = 200;
 const RESHUFFLE_FADE_MS = 200;
 const DRAG_THRESHOLD_RATIO = 0.2;
@@ -126,7 +135,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private createSprite(piece: Piece, x: number, y: number): Phaser.GameObjects.Sprite {
-    const sprite = this.add.sprite(x, y, pieceTextureKey(piece.type));
+    const sprite = this.add.sprite(x, y, pieceTextureKey(piece));
     sprite.setDisplaySize(this.cellSize * PIECE_SCALE, this.cellSize * PIECE_SCALE);
     return sprite;
   }
@@ -229,6 +238,13 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private attemptSwap(a: Position, b: Position): void {
+    // Callers (onPointerMove) already gate on `busy`, but that's not a
+    // guarantee against re-entrancy — without this, a swap started while
+    // another is still animating corrupts pieceIdAt/spriteById (two
+    // concurrent swaps racing to update the same maps), which shows up as
+    // duplicate sprites in a cell and `busy` getting stuck true forever
+    // (the losing animation's promise chain never resolves).
+    if (this.busy) return;
     this.busy = true;
 
     const idA = this.pieceIdAt.get(key(a));
@@ -282,7 +298,7 @@ export class BoardScene extends Phaser.Scene {
         this.movesRemaining--;
         this.emitMovesChanged();
 
-        const steps = resolveCascade(this.board, matches);
+        const steps = resolveCascade(this.board, matches, [a, b]);
         this.recordGoalProgress(steps);
         this.emitGoalProgress();
 
@@ -336,19 +352,24 @@ export class BoardScene extends Phaser.Scene {
   private playCascadeStep(step: CascadeStep): Promise<void> {
     const tweenPromises: Promise<void>[] = [];
 
-    for (const { position } of step.cleared) {
+    for (const { position, piece } of step.cleared) {
       const id = this.pieceIdAt.get(key(position));
       this.pieceIdAt.delete(key(position));
       if (id === undefined) continue;
       const sprite = this.spriteById.get(id);
       if (!sprite) continue;
+      // A special piece triggering (row/column/block/color cleared) is the
+      // "something big just happened" moment — give it a bigger, slower pop
+      // than a plain match clear.
+      const isSpecial = piece.special !== undefined;
       tweenPromises.push(
         new Promise((resolve) => {
           this.tweens.add({
             targets: sprite,
             alpha: 0,
-            scale: 0,
-            duration: CLEAR_DURATION_MS,
+            scale: isSpecial ? sprite.scale * 1.6 : 0,
+            duration: isSpecial ? SPECIAL_CLEAR_DURATION_MS : CLEAR_DURATION_MS,
+            ease: isSpecial ? "Cubic.easeOut" : "Linear",
             onComplete: () => {
               sprite.destroy();
               this.spriteById.delete(id);
@@ -359,11 +380,46 @@ export class BoardScene extends Phaser.Scene {
       );
     }
 
-    for (const fall of step.falls) {
-      const id = this.pieceIdAt.get(key(fall.from));
-      this.pieceIdAt.delete(key(fall.from));
+    for (const { position, piece } of step.created) {
+      const id = this.pieceIdAt.get(key(position));
       if (id === undefined) continue;
+      const sprite = this.spriteById.get(id);
+      if (!sprite) continue;
+      sprite.setTexture(pieceTextureKey(piece));
+      const baseScale = sprite.scale;
+      tweenPromises.push(
+        new Promise((resolve) => {
+          this.tweens.add({
+            targets: sprite,
+            scale: baseScale * 1.25,
+            duration: CREATE_DURATION_MS,
+            yoyo: true,
+            ease: "Sine.easeInOut",
+            onComplete: () => resolve(),
+          });
+        }),
+      );
+    }
+
+    // A single step's falls can chain within one column (e.g. both (0,c)->(1,c)
+    // and (1,c)->(2,c)), since each entry describes one survivor's shift, not
+    // an atomic swap. Reading every `from` id before writing any `to` key
+    // avoids an earlier fall's write clobbering a later fall's read of the
+    // same position — doing it in a single pass corrupts pieceIdAt and
+    // orphans a sprite (it stops being tracked, so it's never moved or
+    // cleaned up again, and visually stacks with whatever ends up there).
+    const fallMoves = step.falls
+      .map((fall) => ({ fall, id: this.pieceIdAt.get(key(fall.from)) }))
+      .filter((move): move is { fall: FallMovement; id: number } => move.id !== undefined);
+
+    for (const { fall } of fallMoves) {
+      this.pieceIdAt.delete(key(fall.from));
+    }
+    for (const { fall, id } of fallMoves) {
       this.pieceIdAt.set(key(fall.to), id);
+    }
+
+    for (const { fall, id } of fallMoves) {
       const sprite = this.spriteById.get(id);
       if (!sprite) continue;
       tweenPromises.push(

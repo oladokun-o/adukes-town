@@ -58,4 +58,20 @@ describe("trySwap", () => {
     expect(board.get({ row: 0, col: 2 }).type).toBe("Red");
     expect(board.get({ row: 1, col: 2 }).type).toBe("Blue");
   });
+
+  it("commits a swap involving a special piece even with no ordinary match", () => {
+    const board = buildBoard([
+      ["Red", "Blue", "Green"],
+      ["Blue", "Green", "Red"],
+      ["Green", "Red", "Blue"],
+    ]);
+    board.get({ row: 0, col: 0 }).special = "Bomb";
+
+    const result = trySwap(board, { row: 0, col: 0 }, { row: 0, col: 1 });
+
+    expect(result).not.toBeNull();
+    expect(board.get({ row: 0, col: 0 }).type).toBe("Blue");
+    expect(board.get({ row: 0, col: 1 }).type).toBe("Red");
+    expect(board.get({ row: 0, col: 1 }).special).toBe("Bomb");
+  });
 });

@@ -34,6 +34,13 @@ const bottomRowMatch: Match = {
     { row: 2, col: 1 },
     { row: 2, col: 2 },
   ],
+  runs: [
+    [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+      { row: 2, col: 2 },
+    ],
+  ],
 };
 
 describe("resolveCascade", () => {
@@ -93,5 +100,147 @@ describe("resolveCascade", () => {
     expect(second.falls).toEqual([]);
     expect(second.spawned).toHaveLength(3);
     expect(second.spawned.map((s) => s.piece.type)).toEqual(["Purple", "Blue", "Green"]);
+  });
+
+  it("creates a Rocket at the seed hint instead of clearing it, on a match-4", () => {
+    const board = new Board(4, 1, 5, queueRng(["Blue", "Yellow", "Purple"]));
+    let id = 0;
+    for (let col = 0; col < 4; col++) {
+      board.set({ row: 0, col }, { id: id++, type: "Red" });
+    }
+
+    const match: Match = {
+      positions: [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+        { row: 0, col: 3 },
+      ],
+      runs: [
+        [
+          { row: 0, col: 0 },
+          { row: 0, col: 1 },
+          { row: 0, col: 2 },
+          { row: 0, col: 3 },
+        ],
+      ],
+    };
+
+    const steps = resolveCascade(
+      board,
+      [match],
+      [
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+      ],
+    );
+    const [step] = steps;
+
+    expect(step.created).toEqual([
+      {
+        position: { row: 0, col: 2 },
+        piece: expect.objectContaining({ type: "Red", special: "Rocket", specialAxis: "row" }),
+      },
+    ]);
+    expect(step.cleared).toHaveLength(3);
+    expect(step.cleared.some((c) => c.position.col === 2)).toBe(false);
+    expect(board.get({ row: 0, col: 2 }).special).toBe("Rocket");
+  });
+
+  it("expands a wave's cleared cells when the match sweeps up an existing special", () => {
+    const board = new Board(3, 3, 5, queueRng(["Blue", "Purple", "Red"]));
+    const layout: PieceType[][] = [
+      ["Red", "Blue", "Yellow"],
+      ["Purple", "Green", "Yellow"],
+      ["Blue", "Yellow", "Red"],
+    ];
+    let id = 0;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        board.set({ row, col }, { id: id++, type: layout[row][col] });
+      }
+    }
+    board.set(
+      { row: 1, col: 1 },
+      {
+        id,
+        type: "Green",
+        special: "Rocket",
+        specialAxis: "row",
+      },
+    );
+
+    const match: Match = { positions: [{ row: 1, col: 1 }], runs: [[{ row: 1, col: 1 }]] };
+
+    const steps = resolveCascade(board, [match]);
+    const [step] = steps;
+
+    expect(step.cleared).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ position: { row: 1, col: 0 } }),
+        expect.objectContaining({ position: { row: 1, col: 1 } }),
+        expect.objectContaining({ position: { row: 1, col: 2 } }),
+      ]),
+    );
+    expect(step.cleared).toHaveLength(3);
+  });
+
+  it("triggers a special swapped in with no ordinary match, via swapPositions", () => {
+    const board = new Board(3, 3, 5, queueRng(["Blue", "Purple", "Red"]));
+    const layout: PieceType[][] = [
+      ["Red", "Blue", "Yellow"],
+      ["Purple", "Green", "Yellow"],
+      ["Blue", "Yellow", "Red"],
+    ];
+    let id = 0;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        board.set({ row, col }, { id: id++, type: layout[row][col] });
+      }
+    }
+    // As if trySwap already moved this Rocket into place — no ordinary
+    // match formed, so findMatches(board) would return [].
+    board.set({ row: 1, col: 1 }, { id, type: "Green", special: "Rocket", specialAxis: "row" });
+
+    const steps = resolveCascade(
+      board,
+      [],
+      [
+        { row: 1, col: 0 },
+        { row: 1, col: 1 },
+      ],
+    );
+
+    expect(steps).toHaveLength(1);
+    const [step] = steps;
+    expect(step.cleared).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ position: { row: 1, col: 0 } }),
+        expect.objectContaining({ position: { row: 1, col: 1 } }),
+        expect.objectContaining({ position: { row: 1, col: 2 } }),
+      ]),
+    );
+    expect(step.cleared).toHaveLength(3);
+  });
+
+  it("produces no steps when swapPositions holds no special and there are no matches", () => {
+    const board = new Board(3, 3, 5, queueRng(["Blue"]));
+    let id = 0;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        board.set({ row, col }, { id: id++, type: "Blue" });
+      }
+    }
+
+    const steps = resolveCascade(
+      board,
+      [],
+      [
+        { row: 1, col: 0 },
+        { row: 1, col: 1 },
+      ],
+    );
+
+    expect(steps).toEqual([]);
   });
 });
