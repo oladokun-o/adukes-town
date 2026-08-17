@@ -45,10 +45,10 @@ describe("resolveCascade", () => {
     expect(steps).toHaveLength(1);
     const [step] = steps;
 
-    expect([...step.cleared].sort((a, b) => a.col - b.col)).toEqual([
-      { row: 2, col: 0 },
-      { row: 2, col: 1 },
-      { row: 2, col: 2 },
+    expect([...step.cleared].sort((a, b) => a.position.col - b.position.col)).toEqual([
+      { position: { row: 2, col: 0 }, piece: expect.objectContaining({ type: "Red" }) },
+      { position: { row: 2, col: 1 }, piece: expect.objectContaining({ type: "Red" }) },
+      { position: { row: 2, col: 2 }, piece: expect.objectContaining({ type: "Red" }) },
     ]);
 
     expect(step.falls).toEqual(

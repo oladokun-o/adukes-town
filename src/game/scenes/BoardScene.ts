@@ -3,12 +3,10 @@ import { Board } from "@/game/board/Board";
 import { resolveCascade } from "@/game/board/cascade";
 import { hasValidMove, reshuffleUntilSolvable } from "@/game/board/noDeadEnd";
 import { trySwap } from "@/game/board/swap";
-import type { CascadeStep, Piece, Position, SpawnedPiece } from "@/game/board/types";
+import type { CascadeStep, Piece, PieceType, Position, SpawnedPiece } from "@/game/board/types";
+import { getLevelById } from "@/game/levels";
+import type { LevelDef } from "@/game/levels/types";
 import { ensurePieceTextures, pieceTextureKey } from "@/game/scenes/pieceTextures";
-
-const BOARD_WIDTH = 8;
-const BOARD_HEIGHT = 8;
-const COLOR_COUNT = 5;
 
 const PIECE_TEXTURE_SIZE = 128;
 const BOARD_MARGIN = 0.9;
@@ -31,6 +29,7 @@ interface DragState {
 }
 
 export class BoardScene extends Phaser.Scene {
+  private level!: LevelDef;
   private board!: Board;
   private cellSize = 0;
   private originX = 0;
@@ -39,15 +38,25 @@ export class BoardScene extends Phaser.Scene {
   private pieceIdAt = new Map<string, number>();
   private drag: DragState | null = null;
   private busy = false;
+  private movesRemaining = 0;
+  private goalProgress: Partial<Record<PieceType, number>> = {};
+  private levelOver = false;
 
   constructor() {
     super("BoardScene");
   }
 
+  init(data: { level?: LevelDef }): void {
+    this.level = data.level ?? getLevelById("level001");
+    this.movesRemaining = this.level.moveLimit;
+    this.goalProgress = {};
+    this.levelOver = false;
+  }
+
   create(): void {
     ensurePieceTextures(this, PIECE_TEXTURE_SIZE);
 
-    this.board = new Board(BOARD_WIDTH, BOARD_HEIGHT, COLOR_COUNT);
+    this.board = new Board(this.level.width, this.level.height, this.level.colorCount);
     this.board.refill();
     reshuffleUntilSolvable(this.board);
 
@@ -63,9 +72,11 @@ export class BoardScene extends Phaser.Scene {
   private computeLayout(): void {
     const availW = this.cameras.main.width;
     const availH = this.cameras.main.height;
-    this.cellSize = Math.floor((Math.min(availW, availH) * BOARD_MARGIN) / BOARD_WIDTH);
-    const boardPixelWidth = this.cellSize * BOARD_WIDTH;
-    const boardPixelHeight = this.cellSize * BOARD_HEIGHT;
+    this.cellSize = Math.floor(
+      (Math.min(availW, availH) * BOARD_MARGIN) / Math.max(this.level.width, this.level.height),
+    );
+    const boardPixelWidth = this.cellSize * this.level.width;
+    const boardPixelHeight = this.cellSize * this.level.height;
     this.originX = (availW - boardPixelWidth) / 2;
     this.originY = (availH - boardPixelHeight) / 2;
   }
@@ -90,8 +101,8 @@ export class BoardScene extends Phaser.Scene {
     this.pieceIdAt.clear();
 
     const buildFresh = (): void => {
-      for (let row = 0; row < BOARD_HEIGHT; row++) {
-        for (let col = 0; col < BOARD_WIDTH; col++) {
+      for (let row = 0; row < this.level.height; row++) {
+        for (let col = 0; col < this.level.width; col++) {
           const pos = { row, col };
           const piece = this.board.get(pos);
           const sprite = this.createSprite(piece, this.screenX(col), this.screenY(row));
@@ -136,19 +147,19 @@ export class BoardScene extends Phaser.Scene {
   private cellAt(worldX: number, worldY: number): Position | null {
     const col = Math.floor((worldX - this.originX) / this.cellSize);
     const row = Math.floor((worldY - this.originY) / this.cellSize);
-    if (row < 0 || row >= BOARD_HEIGHT || col < 0 || col >= BOARD_WIDTH) return null;
+    if (row < 0 || row >= this.level.height || col < 0 || col >= this.level.width) return null;
     return { row, col };
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.busy) return;
+    if (this.busy || this.levelOver) return;
     const cell = this.cellAt(pointer.worldX, pointer.worldY);
     if (!cell) return;
     this.drag = { start: cell, startX: pointer.worldX, startY: pointer.worldY, resolved: false };
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.busy || !this.drag || this.drag.resolved) return;
+    if (this.busy || this.levelOver || !this.drag || this.drag.resolved) return;
 
     const dx = pointer.worldX - this.drag.startX;
     const dy = pointer.worldY - this.drag.startY;
@@ -167,9 +178,9 @@ export class BoardScene extends Phaser.Scene {
 
     if (
       target.row < 0 ||
-      target.row >= BOARD_HEIGHT ||
+      target.row >= this.level.height ||
       target.col < 0 ||
-      target.col >= BOARD_WIDTH
+      target.col >= this.level.width
     ) {
       return;
     }
@@ -232,17 +243,46 @@ export class BoardScene extends Phaser.Scene {
 
         this.pieceIdAt.set(key(a), idB);
         this.pieceIdAt.set(key(b), idA);
+        this.movesRemaining--;
 
         const steps = resolveCascade(this.board, matches);
+        this.recordGoalProgress(steps);
+
         void this.playCascade(steps).then(() => {
-          if (!hasValidMove(this.board)) {
+          console.log("movesRemaining", this.movesRemaining, "goalProgress", this.goalProgress);
+
+          if (this.isGoalMet()) {
+            this.levelOver = true;
+            console.log("level:win", this.level.id);
+          } else if (this.movesRemaining <= 0) {
+            this.levelOver = true;
+            console.log("level:lose", this.level.id);
+          } else if (!hasValidMove(this.board)) {
             reshuffleUntilSolvable(this.board);
             this.renderFullBoard(true);
           }
+
           this.busy = false;
         });
       },
     });
+  }
+
+  private recordGoalProgress(steps: CascadeStep[]): void {
+    const targets = this.level.goal.targets;
+    for (const step of steps) {
+      for (const { piece } of step.cleared) {
+        if (targets[piece.type] === undefined) continue;
+        this.goalProgress[piece.type] = (this.goalProgress[piece.type] ?? 0) + 1;
+      }
+    }
+  }
+
+  private isGoalMet(): boolean {
+    const targets = this.level.goal.targets;
+    return (Object.keys(targets) as PieceType[]).every(
+      (type) => (this.goalProgress[type] ?? 0) >= (targets[type] ?? 0),
+    );
   }
 
   private async playCascade(steps: CascadeStep[]): Promise<void> {
@@ -254,9 +294,9 @@ export class BoardScene extends Phaser.Scene {
   private playCascadeStep(step: CascadeStep): Promise<void> {
     const tweenPromises: Promise<void>[] = [];
 
-    for (const pos of step.cleared) {
-      const id = this.pieceIdAt.get(key(pos));
-      this.pieceIdAt.delete(key(pos));
+    for (const { position } of step.cleared) {
+      const id = this.pieceIdAt.get(key(position));
+      this.pieceIdAt.delete(key(position));
       if (id === undefined) continue;
       const sprite = this.spriteById.get(id);
       if (!sprite) continue;

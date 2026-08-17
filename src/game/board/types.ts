@@ -32,8 +32,13 @@ export interface SpawnedPiece {
   piece: Piece;
 }
 
+export interface ClearedPiece {
+  position: Position;
+  piece: Piece;
+}
+
 export interface CascadeStep {
-  cleared: Position[];
+  cleared: ClearedPiece[];
   falls: FallMovement[];
   spawned: SpawnedPiece[];
 }

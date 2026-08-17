@@ -1,6 +1,13 @@
 import type { Board } from "./Board";
 import { findMatches } from "./matchDetection";
-import type { CascadeStep, FallMovement, Match, Position, SpawnedPiece } from "./types";
+import type {
+  CascadeStep,
+  ClearedPiece,
+  FallMovement,
+  Match,
+  Position,
+  SpawnedPiece,
+} from "./types";
 
 function uniquePositions(matches: Match[]): Position[] {
   const seen = new Set<string>();
@@ -22,10 +29,15 @@ export function resolveCascade(board: Board, initialMatches: Match[]): CascadeSt
   let matches = initialMatches;
 
   while (matches.length > 0) {
-    const cleared = uniquePositions(matches);
-    const affectedCols = [...new Set(cleared.map((pos) => pos.col))];
+    const clearedPositions = uniquePositions(matches);
+    const affectedCols = [...new Set(clearedPositions.map((pos) => pos.col))];
 
-    for (const pos of cleared) {
+    const cleared: ClearedPiece[] = clearedPositions.map((position) => ({
+      position,
+      piece: board.get(position),
+    }));
+
+    for (const pos of clearedPositions) {
       board.clear(pos);
     }
 
