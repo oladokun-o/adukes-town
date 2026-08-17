@@ -1,7 +1,7 @@
 import Phaser from "phaser";
+import { BoardScene } from "@/game/scenes/BoardScene";
 
-// Scenes are added here as they're built. Starting empty on purpose —
-// this file grows as Stage 1 progresses (Boot -> Preload -> Board).
+// Scenes are added here as they're built.
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "app",
@@ -10,7 +10,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [],
+  scene: [BoardScene],
 };
 
 new Phaser.Game(config);
