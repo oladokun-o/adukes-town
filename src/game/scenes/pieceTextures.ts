@@ -11,7 +11,7 @@ export function pieceTextureKey(piece: Piece): string {
   return `piece-${piece.type}`;
 }
 
-const PIECE_COLORS: Record<PieceType, number> = {
+export const PIECE_COLORS: Record<PieceType, number> = {
   Red: 0xe74c3c,
   Blue: 0x3498db,
   Green: 0x2ecc71,
@@ -103,6 +103,20 @@ function drawRainbowBall(g: Phaser.GameObjects.Graphics, r: number): void {
     g.closePath();
     g.fillPath();
   }
+}
+
+export const PARTICLE_TEXTURE_KEY = "particle-dot";
+
+// A single small white circle, tinted per piece color at explode time
+// (ParticleEmitter.setParticleTint) rather than generating one texture per
+// color — cheaper and keeps the "no art assets" approach consistent.
+export function ensureParticleTexture(scene: Phaser.Scene, size: number): void {
+  if (scene.textures.exists(PARTICLE_TEXTURE_KEY)) return;
+  const graphics = scene.add.graphics();
+  graphics.fillStyle(0xffffff, 1);
+  graphics.fillCircle(size / 2, size / 2, size / 2);
+  graphics.generateTexture(PARTICLE_TEXTURE_KEY, size, size);
+  graphics.destroy();
 }
 
 // Generated once per size and cached on the texture manager so re-entering

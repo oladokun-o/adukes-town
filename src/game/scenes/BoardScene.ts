@@ -11,14 +11,27 @@ import type {
   Position,
   SpawnedPiece,
 } from "@/game/board/types";
+import {
+  playMatchPop,
+  playSpecialCreate,
+  playSpecialTrigger,
+  resumeAudioContext,
+} from "@/game/audio/juiceSounds";
 import { emitGameEvent, GameEvents, offGameEvent, onGameEvent } from "@/game/events";
 import { getLevelById } from "@/game/levels";
 import { clearProgress, getStoredProgress, storeProgress } from "@/game/levels/progress";
 import type { LevelDef } from "@/game/levels/types";
-import { ensurePieceTextures, pieceTextureKey } from "@/game/scenes/pieceTextures";
+import {
+  ensureParticleTexture,
+  ensurePieceTextures,
+  PARTICLE_TEXTURE_KEY,
+  PIECE_COLORS,
+  pieceTextureKey,
+} from "@/game/scenes/pieceTextures";
 import { applyRelaxMode, isRelaxModeEnabled } from "@/settings/relaxMode";
 
 const PIECE_TEXTURE_SIZE = 128;
+const PARTICLE_TEXTURE_SIZE = 16;
 const BOARD_MARGIN = 0.9;
 const PIECE_SCALE = 0.86;
 const SWAP_DURATION_MS = 150;
@@ -28,6 +41,16 @@ const CREATE_DURATION_MS = 220;
 const FALL_DURATION_MS = 200;
 const RESHUFFLE_FADE_MS = 200;
 const DRAG_THRESHOLD_RATIO = 0.2;
+
+const PARTICLE_COUNT = 8;
+const SPECIAL_PARTICLE_COUNT = 16;
+// Escalating juice across a cascade chain, per the research doc's "juice is
+// the product, not decoration" — but a plain single 3-match (wave 0, no
+// special) stays calm; the shake/pop only ramps up once a chain or a
+// special is actually happening.
+const SHAKE_BASE_DURATION_MS = 90;
+const SHAKE_BASE_INTENSITY = 0.004;
+const SHAKE_MAX_MULTIPLIER = 3;
 
 function key(pos: Position): string {
   return `${pos.row},${pos.col}`;
@@ -48,6 +71,7 @@ export class BoardScene extends Phaser.Scene {
   private originY = 0;
   private spriteById = new Map<number, Phaser.GameObjects.Sprite>();
   private pieceIdAt = new Map<string, number>();
+  private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private drag: DragState | null = null;
   private busy = false;
   private movesRemaining = 0;
@@ -71,6 +95,14 @@ export class BoardScene extends Phaser.Scene {
 
   create(): void {
     ensurePieceTextures(this, PIECE_TEXTURE_SIZE);
+    ensureParticleTexture(this, PARTICLE_TEXTURE_SIZE);
+    this.particles = this.add.particles(0, 0, PARTICLE_TEXTURE_KEY, {
+      lifespan: 400,
+      speed: { min: 80, max: 220 },
+      scale: { start: 1, end: 0 },
+      alpha: { start: 1, end: 0 },
+      frequency: -1, // explode-only; never emits on its own
+    });
 
     this.board = new Board(this.level.width, this.level.height, this.level.colorCount);
     this.board.refill();
@@ -197,6 +229,10 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    // Browsers block audio until a user gesture; the first pointer-down of
+    // the session is as good a gesture as any to unblock it.
+    resumeAudioContext();
+
     if (this.busy || this.levelOver || this.paused) return;
     const cell = this.cellAt(pointer.worldX, pointer.worldY);
     if (!cell) return;
@@ -344,13 +380,14 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private async playCascade(steps: CascadeStep[]): Promise<void> {
-    for (const step of steps) {
-      await this.playCascadeStep(step);
+    for (const [waveIndex, step] of steps.entries()) {
+      await this.playCascadeStep(step, waveIndex);
     }
   }
 
-  private playCascadeStep(step: CascadeStep): Promise<void> {
+  private playCascadeStep(step: CascadeStep, waveIndex: number): Promise<void> {
     const tweenPromises: Promise<void>[] = [];
+    let hasSpecialCleared = false;
 
     for (const { position, piece } of step.cleared) {
       const id = this.pieceIdAt.get(key(position));
@@ -362,6 +399,15 @@ export class BoardScene extends Phaser.Scene {
       // "something big just happened" moment — give it a bigger, slower pop
       // than a plain match clear.
       const isSpecial = piece.special !== undefined;
+      if (isSpecial) hasSpecialCleared = true;
+
+      this.particles.setParticleTint(PIECE_COLORS[piece.type]);
+      this.particles.explode(
+        isSpecial ? SPECIAL_PARTICLE_COUNT : PARTICLE_COUNT,
+        sprite.x,
+        sprite.y,
+      );
+
       tweenPromises.push(
         new Promise((resolve) => {
           this.tweens.add({
@@ -377,6 +423,27 @@ export class BoardScene extends Phaser.Scene {
             },
           });
         }),
+      );
+    }
+
+    if (step.cleared.length > 0) {
+      playMatchPop(waveIndex);
+      if (hasSpecialCleared) playSpecialTrigger();
+    }
+    if (step.created.length > 0) playSpecialCreate();
+
+    // A chain wave or a special triggering is the "something big is
+    // happening" moment the shake is reserved for — a plain single 3-match
+    // stays calm, per the "positive reinforcement, not punishment" note in
+    // the match-3 research doc.
+    if (waveIndex > 0 || hasSpecialCleared) {
+      const multiplier = Math.min(
+        1 + waveIndex * 0.4 + (hasSpecialCleared ? 0.6 : 0),
+        SHAKE_MAX_MULTIPLIER,
+      );
+      this.cameras.main.shake(
+        SHAKE_BASE_DURATION_MS * multiplier,
+        SHAKE_BASE_INTENSITY * multiplier,
       );
     }
 
