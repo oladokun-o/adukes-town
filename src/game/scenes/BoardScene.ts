@@ -6,8 +6,10 @@ import { trySwap } from "@/game/board/swap";
 import type { CascadeStep, Piece, PieceType, Position, SpawnedPiece } from "@/game/board/types";
 import { emitGameEvent, GameEvents, offGameEvent, onGameEvent } from "@/game/events";
 import { getLevelById } from "@/game/levels";
+import { clearProgress, getStoredProgress, storeProgress } from "@/game/levels/progress";
 import type { LevelDef } from "@/game/levels/types";
 import { ensurePieceTextures, pieceTextureKey } from "@/game/scenes/pieceTextures";
+import { applyRelaxMode, isRelaxModeEnabled } from "@/settings/relaxMode";
 
 const PIECE_TEXTURE_SIZE = 128;
 const BOARD_MARGIN = 0.9;
@@ -40,6 +42,7 @@ export class BoardScene extends Phaser.Scene {
   private drag: DragState | null = null;
   private busy = false;
   private movesRemaining = 0;
+  private effectiveMoveLimit = 0;
   private goalProgress: Partial<Record<PieceType, number>> = {};
   private levelOver = false;
   private paused = false;
@@ -50,8 +53,9 @@ export class BoardScene extends Phaser.Scene {
 
   init(data: { level?: LevelDef }): void {
     this.level = data.level ?? getLevelById("level001");
-    this.movesRemaining = this.level.moveLimit;
-    this.goalProgress = {};
+    this.effectiveMoveLimit = applyRelaxMode(this.level.moveLimit, isRelaxModeEnabled());
+    this.movesRemaining = this.effectiveMoveLimit;
+    this.goalProgress = getStoredProgress(this.level.id);
     this.levelOver = false;
     this.paused = false;
   }
@@ -90,7 +94,7 @@ export class BoardScene extends Phaser.Scene {
   private emitMovesChanged(): void {
     emitGameEvent(GameEvents.MovesChanged, {
       movesRemaining: this.movesRemaining,
-      moveLimit: this.level.moveLimit,
+      moveLimit: this.effectiveMoveLimit,
     });
   }
 
@@ -285,10 +289,16 @@ export class BoardScene extends Phaser.Scene {
         void this.playCascade(steps).then(() => {
           if (this.isGoalMet()) {
             this.levelOver = true;
+            clearProgress(this.level.id);
             emitGameEvent(GameEvents.LevelWin, { levelId: this.level.id });
           } else if (this.movesRemaining <= 0) {
             this.levelOver = true;
-            emitGameEvent(GameEvents.LevelLose, { levelId: this.level.id });
+            storeProgress(this.level.id, this.goalProgress);
+            emitGameEvent(GameEvents.LevelLose, {
+              levelId: this.level.id,
+              progress: this.goalProgress,
+              targets: this.level.goal.targets,
+            });
           } else if (!hasValidMove(this.board)) {
             reshuffleUntilSolvable(this.board);
             this.renderFullBoard(true);

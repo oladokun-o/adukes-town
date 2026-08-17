@@ -29,6 +29,8 @@ export interface LevelWinPayload {
 
 export interface LevelLosePayload {
   levelId: string;
+  progress: Partial<Record<PieceType, number>>;
+  targets: Partial<Record<PieceType, number>>;
 }
 
 interface GameEventPayloads {

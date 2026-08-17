@@ -22,6 +22,10 @@
     <div id="pause-overlay" class="overlay" hidden>
       <div class="overlay-panel">
         <p>Paused</p>
+        <label class="relax-mode-label">
+          <input type="checkbox" id="relax-mode-toggle" />
+          Relax mode (more moves)
+        </label>
         <button id="resume-btn" type="button">Resume</button>
       </div>
     </div>
@@ -29,6 +33,7 @@
     <div id="result-modal" class="overlay" hidden>
       <div class="overlay-panel">
         <h2 id="result-title"></h2>
+        <p id="result-progress"></p>
         <button id="play-again-btn" type="button">Play Again</button>
       </div>
     </div>
