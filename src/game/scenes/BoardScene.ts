@@ -4,6 +4,7 @@ import { resolveCascade } from "@/game/board/cascade";
 import { hasValidMove, reshuffleUntilSolvable } from "@/game/board/noDeadEnd";
 import { trySwap } from "@/game/board/swap";
 import type { CascadeStep, Piece, PieceType, Position, SpawnedPiece } from "@/game/board/types";
+import { emitGameEvent, GameEvents, offGameEvent, onGameEvent } from "@/game/events";
 import { getLevelById } from "@/game/levels";
 import type { LevelDef } from "@/game/levels/types";
 import { ensurePieceTextures, pieceTextureKey } from "@/game/scenes/pieceTextures";
@@ -41,6 +42,7 @@ export class BoardScene extends Phaser.Scene {
   private movesRemaining = 0;
   private goalProgress: Partial<Record<PieceType, number>> = {};
   private levelOver = false;
+  private paused = false;
 
   constructor() {
     super("BoardScene");
@@ -51,6 +53,7 @@ export class BoardScene extends Phaser.Scene {
     this.movesRemaining = this.level.moveLimit;
     this.goalProgress = {};
     this.levelOver = false;
+    this.paused = false;
   }
 
   create(): void {
@@ -67,6 +70,35 @@ export class BoardScene extends Phaser.Scene {
     this.input.on("pointermove", this.onPointerMove, this);
     this.input.on("pointerup", this.onPointerUp, this);
     this.input.on("pointerupoutside", this.onPointerUp, this);
+
+    onGameEvent(GameEvents.PauseToggle, this.onPauseToggle, this);
+    // BoardScene is never restarted with a stale listener today (no other
+    // scene re-creates it), but this keeps the shared emitter clean if that
+    // changes later.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      offGameEvent(GameEvents.PauseToggle, this.onPauseToggle, this);
+    });
+
+    this.emitMovesChanged();
+    this.emitGoalProgress();
+  }
+
+  private onPauseToggle(): void {
+    this.paused = !this.paused;
+  }
+
+  private emitMovesChanged(): void {
+    emitGameEvent(GameEvents.MovesChanged, {
+      movesRemaining: this.movesRemaining,
+      moveLimit: this.level.moveLimit,
+    });
+  }
+
+  private emitGoalProgress(): void {
+    emitGameEvent(GameEvents.GoalProgress, {
+      targets: this.level.goal.targets,
+      progress: this.goalProgress,
+    });
   }
 
   private computeLayout(): void {
@@ -152,14 +184,14 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.busy || this.levelOver) return;
+    if (this.busy || this.levelOver || this.paused) return;
     const cell = this.cellAt(pointer.worldX, pointer.worldY);
     if (!cell) return;
     this.drag = { start: cell, startX: pointer.worldX, startY: pointer.worldY, resolved: false };
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.busy || this.levelOver || !this.drag || this.drag.resolved) return;
+    if (this.busy || this.levelOver || this.paused || !this.drag || this.drag.resolved) return;
 
     const dx = pointer.worldX - this.drag.startX;
     const dy = pointer.worldY - this.drag.startY;
@@ -244,19 +276,19 @@ export class BoardScene extends Phaser.Scene {
         this.pieceIdAt.set(key(a), idB);
         this.pieceIdAt.set(key(b), idA);
         this.movesRemaining--;
+        this.emitMovesChanged();
 
         const steps = resolveCascade(this.board, matches);
         this.recordGoalProgress(steps);
+        this.emitGoalProgress();
 
         void this.playCascade(steps).then(() => {
-          console.log("movesRemaining", this.movesRemaining, "goalProgress", this.goalProgress);
-
           if (this.isGoalMet()) {
             this.levelOver = true;
-            console.log("level:win", this.level.id);
+            emitGameEvent(GameEvents.LevelWin, { levelId: this.level.id });
           } else if (this.movesRemaining <= 0) {
             this.levelOver = true;
-            console.log("level:lose", this.level.id);
+            emitGameEvent(GameEvents.LevelLose, { levelId: this.level.id });
           } else if (!hasValidMove(this.board)) {
             reshuffleUntilSolvable(this.board);
             this.renderFullBoard(true);

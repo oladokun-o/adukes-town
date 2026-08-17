@@ -8,9 +8,31 @@
     />
     <meta name="theme-color" content="#ff8fb3" />
     <title>Aduke's Town</title>
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div id="app"></div>
+
+    <div id="hud">
+      <span id="moves"></span>
+      <span id="goal"></span>
+      <button id="pause-btn" type="button">Pause</button>
+    </div>
+
+    <div id="pause-overlay" class="overlay" hidden>
+      <div class="overlay-panel">
+        <p>Paused</p>
+        <button id="resume-btn" type="button">Resume</button>
+      </div>
+    </div>
+
+    <div id="result-modal" class="overlay" hidden>
+      <div class="overlay-panel">
+        <h2 id="result-title"></h2>
+        <button id="play-again-btn" type="button">Play Again</button>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
