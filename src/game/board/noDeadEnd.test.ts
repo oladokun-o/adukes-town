@@ -54,4 +54,13 @@ describe("reshuffleUntilSolvable", () => {
     expect(findMatches(board)).toEqual([]);
     expect(hasValidMove(board)).toBe(true);
   });
+
+  it("terminates (does not hang) even on a board with no solvable arrangement", () => {
+    // A 2x2 board can never have a 3-in-a-row match, so no arrangement is
+    // ever "solvable" — this used to be an infinite loop.
+    const board = new Board(2, 2, 5);
+    board.refill();
+
+    expect(() => reshuffleUntilSolvable(board)).not.toThrow();
+  });
 });

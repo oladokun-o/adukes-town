@@ -45,8 +45,36 @@ function reshuffleTypes(board: Board): void {
   });
 }
 
+function redrawAllTypes(board: Board): void {
+  for (let row = 0; row < board.height; row++) {
+    for (let col = 0; col < board.width; col++) {
+      board.clear({ row, col });
+    }
+  }
+  board.refill();
+}
+
+// Rejection-sampling a solvable arrangement is unbounded in principle — for
+// a pathological color multiset, no permutation may satisfy "no free match +
+// has a valid move," which would loop forever and hang the tab. Bound each
+// strategy instead: first try permuting the current multiset (cheap, and
+// preserves piece counts, so this is what actually runs almost every time);
+// if that doesn't converge, fall back to independent re-draws (not
+// constrained to the current multiset, so strictly more likely to land on a
+// solvable board); if even that fails, give up rather than hang — an
+// occasional dead-end board (BoardScene reshuffles again on the next match
+// anyway) beats an unresponsive game.
+const RESHUFFLE_MAX_ATTEMPTS = 300;
+const REDRAW_MAX_ATTEMPTS = 300;
+
 export function reshuffleUntilSolvable(board: Board): void {
-  do {
+  for (let attempt = 0; attempt < RESHUFFLE_MAX_ATTEMPTS; attempt++) {
     reshuffleTypes(board);
-  } while (findMatches(board).length > 0 || !hasValidMove(board));
+    if (findMatches(board).length === 0 && hasValidMove(board)) return;
+  }
+
+  for (let attempt = 0; attempt < REDRAW_MAX_ATTEMPTS; attempt++) {
+    redrawAllTypes(board);
+    if (findMatches(board).length === 0 && hasValidMove(board)) return;
+  }
 }
