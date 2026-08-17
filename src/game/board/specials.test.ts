@@ -175,6 +175,43 @@ describe("expandSpecialClears", () => {
     expect(result).toHaveLength(2);
   });
 
+  it("sweeps in the swap partner's color for a RainbowBall, not its own", () => {
+    const board = new Board(3, 1, 5);
+    const rainbowPos = { row: 0, col: 1 };
+    const partnerPos = { row: 0, col: 0 };
+    board.set(partnerPos, { id: 0, type: "Blue" });
+    board.set(rainbowPos, { id: 1, type: "Red", special: "RainbowBall" });
+    board.set({ row: 0, col: 2 }, { id: 2, type: "Blue" });
+
+    const result = expandSpecialClears(board, [rainbowPos], [rainbowPos, partnerPos]);
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+      ]),
+    );
+    expect(result).toHaveLength(3);
+  });
+
+  it("falls back to its own color for a RainbowBall triggered without swap context", () => {
+    const board = new Board(3, 1, 5);
+    board.set({ row: 0, col: 0 }, { id: 0, type: "Red" });
+    board.set({ row: 0, col: 1 }, { id: 1, type: "Red", special: "RainbowBall" });
+    board.set({ row: 0, col: 2 }, { id: 2, type: "Blue" });
+
+    const result = expandSpecialClears(board, [{ row: 0, col: 1 }]);
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+      ]),
+    );
+    expect(result).toHaveLength(2);
+  });
+
   it("does not recursively trigger a special swept up by another special's expansion", () => {
     const board = new Board(3, 3, 5);
     let id = 0;

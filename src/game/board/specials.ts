@@ -1,5 +1,5 @@
 import type { Board } from "./Board";
-import type { Match, Piece, Position, SpecialType } from "./types";
+import type { Match, Piece, PieceType, Position, SpecialType } from "./types";
 
 function positionKey(pos: Position): string {
   return `${pos.row},${pos.col}`;
@@ -54,23 +54,46 @@ function bombClearPositions(board: Board, seed: Position): Position[] {
   return positions;
 }
 
-function rainbowClearPositions(board: Board, piece: Piece): Position[] {
+function rainbowClearPositions(board: Board, targetType: PieceType): Position[] {
   const positions: Position[] = [];
   for (let row = 0; row < board.height; row++) {
     for (let col = 0; col < board.width; col++) {
       const pos = { row, col };
       const other = board.peek(pos);
-      if (other !== null && other.type === piece.type) positions.push(pos);
+      if (other !== null && other.type === targetType) positions.push(pos);
     }
   }
   return positions;
+}
+
+// A RainbowBall clears whatever color it's paired with, not its own
+// (arbitrary, visually-hidden) spawn color — the pairing is the piece it was
+// just swapped for, i.e. whatever now sits at the other swap position. Falls
+// back to the ball's own type when it triggers with no swap context (e.g.
+// matched into an ordinary run rather than swapped).
+function rainbowTargetType(
+  board: Board,
+  pos: Position,
+  piece: Piece,
+  swapPositions: [Position, Position] | undefined,
+): PieceType {
+  if (!swapPositions) return piece.type;
+  const [a, b] = swapPositions;
+  const key = positionKey(pos);
+  const partner = key === positionKey(a) ? b : key === positionKey(b) ? a : null;
+  if (!partner) return piece.type;
+  return board.peek(partner)?.type ?? piece.type;
 }
 
 // Expands a set of about-to-be-cleared positions to include the extra cells
 // any special piece among them sweeps in. Single-level only: a special swept
 // up by another special's expansion clears as a plain piece — it does not
 // also trigger.
-export function expandSpecialClears(board: Board, positions: Position[]): Position[] {
+export function expandSpecialClears(
+  board: Board,
+  positions: Position[],
+  swapPositions?: [Position, Position],
+): Position[] {
   const seen = new Set(positions.map(positionKey));
   const result = [...positions];
 
@@ -83,7 +106,7 @@ export function expandSpecialClears(board: Board, positions: Position[]): Positi
         ? rocketClearPositions(board, pos, piece.specialAxis ?? "row")
         : piece.special === "Bomb"
           ? bombClearPositions(board, pos)
-          : rainbowClearPositions(board, piece);
+          : rainbowClearPositions(board, rainbowTargetType(board, pos, piece, swapPositions));
 
     for (const extraPos of extra) {
       const key = positionKey(extraPos);

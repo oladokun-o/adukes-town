@@ -77,6 +77,7 @@ export function resolveCascade(
   }
 
   let hint = swapPositions?.[1];
+  let swapPair = swapPositions;
 
   while (matches.length > 0) {
     const creations = new Map<string, { seed: Position; creation: SpecialCreation }>();
@@ -90,7 +91,7 @@ export function resolveCascade(
     const clearedPositionsRaw = uniquePositions(matches).filter(
       (pos) => !creations.has(positionKey(pos)),
     );
-    const clearedPositions = expandSpecialClears(board, clearedPositionsRaw);
+    const clearedPositions = expandSpecialClears(board, clearedPositionsRaw, swapPair);
     const affectedCols = [...new Set(clearedPositions.map((pos) => pos.col))];
 
     const cleared: ClearedPiece[] = clearedPositions.map((position) => ({
@@ -146,6 +147,7 @@ export function resolveCascade(
 
     matches = findMatches(board);
     hint = undefined;
+    swapPair = undefined;
   }
 
   return steps;
