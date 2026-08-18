@@ -1,45 +1,41 @@
+import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import {
   applyRelaxMode,
   isRelaxModeEnabled,
+  loadRelaxModeFromDb,
   setRelaxModeEnabled,
-  type RelaxModeStorage,
 } from "@/settings/relaxMode";
-
-class FakeStorage implements RelaxModeStorage {
-  private map = new Map<string, string>();
-
-  getItem(key: string): string | null {
-    return this.map.get(key) ?? null;
-  }
-
-  setItem(key: string, value: string): void {
-    this.map.set(key, value);
-  }
-}
-
-describe("relax mode storage", () => {
-  it("defaults to disabled when nothing is stored", () => {
-    const storage = new FakeStorage();
-    expect(isRelaxModeEnabled(storage)).toBe(false);
-  });
-
-  it("round-trips the enabled flag", () => {
-    const storage = new FakeStorage();
-    setRelaxModeEnabled(true, storage);
-    expect(isRelaxModeEnabled(storage)).toBe(true);
-    setRelaxModeEnabled(false, storage);
-    expect(isRelaxModeEnabled(storage)).toBe(false);
-  });
-});
+import { idbGet, idbSet } from "@/save/db";
 
 describe("applyRelaxMode", () => {
-  it("returns the move limit unchanged when disabled", () => {
+  it("leaves the move limit untouched when disabled", () => {
     expect(applyRelaxMode(20, false)).toBe(20);
   });
 
-  it("increases the move limit by 1.5x, rounded up, when enabled", () => {
+  it("scales the move limit up by 1.5x, rounded up, when enabled", () => {
     expect(applyRelaxMode(20, true)).toBe(30);
     expect(applyRelaxMode(15, true)).toBe(23);
+  });
+});
+
+describe("isRelaxModeEnabled / setRelaxModeEnabled", () => {
+  it("persists the flag to IndexedDB and updates the in-memory cache immediately", async () => {
+    await setRelaxModeEnabled(true);
+    expect(isRelaxModeEnabled()).toBe(true);
+    expect(await idbGet("settings:relax-mode")).toBe(true);
+
+    await setRelaxModeEnabled(false);
+    expect(isRelaxModeEnabled()).toBe(false);
+    expect(await idbGet("settings:relax-mode")).toBe(false);
+  });
+
+  it("loadRelaxModeFromDb hydrates the cache from whatever is persisted in IndexedDB", async () => {
+    // written directly, bypassing setRelaxModeEnabled — simulates a value
+    // saved in a prior session, before the in-memory cache is hydrated.
+    await idbSet("settings:relax-mode", true);
+
+    await loadRelaxModeFromDb();
+    expect(isRelaxModeEnabled()).toBe(true);
   });
 });

@@ -46,7 +46,9 @@ export class Hud {
       this.loadLevel(this.pendingLevelId);
     });
     this.relaxModeToggle.addEventListener("change", () => {
-      setRelaxModeEnabled(this.relaxModeToggle.checked);
+      setRelaxModeEnabled(this.relaxModeToggle.checked).catch((err: unknown) => {
+        console.warn("Aduke's Town: couldn't save relax-mode setting.", err);
+      });
     });
 
     onGameEvent(GameEvents.MovesChanged, this.onMovesChanged, this);

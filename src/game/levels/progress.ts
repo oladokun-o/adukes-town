@@ -1,36 +1,49 @@
 import type { PieceType } from "@/game/board/types";
+import { idbDelete, idbGet, idbSet } from "@/save/db";
 
-export interface ProgressStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
+type LevelProgress = Partial<Record<PieceType, number>>;
+
+function idbKey(levelId: string): string {
+  return `progress:${levelId}`;
 }
 
-function progressKey(levelId: string): string {
-  return `adukes-town:progress:${levelId}`;
-}
+// Phaser's scene lifecycle reads progress synchronously in `init()`, but
+// IndexedDB is inherently async — so this cache is the source of truth for
+// reads/writes, hydrated from IndexedDB once at app bootstrap (see
+// `loadProgressFromDb`) and written through on every change. Tests inject a
+// throwaway Map instead, which skips IndexedDB entirely and stays synchronous.
+const defaultCache = new Map<string, LevelProgress>();
 
 export function getStoredProgress(
   levelId: string,
-  storage: ProgressStorage = localStorage,
-): Partial<Record<PieceType, number>> {
-  const raw = storage.getItem(progressKey(levelId));
-  if (raw === null) return {};
-  try {
-    return JSON.parse(raw) as Partial<Record<PieceType, number>>;
-  } catch {
-    return {};
-  }
+  cache: Map<string, LevelProgress> = defaultCache,
+): LevelProgress {
+  return cache.get(levelId) ?? {};
 }
 
-export function storeProgress(
+export async function storeProgress(
   levelId: string,
-  progress: Partial<Record<PieceType, number>>,
-  storage: ProgressStorage = localStorage,
-): void {
-  storage.setItem(progressKey(levelId), JSON.stringify(progress));
+  progress: LevelProgress,
+  cache: Map<string, LevelProgress> = defaultCache,
+): Promise<void> {
+  cache.set(levelId, progress);
+  if (cache === defaultCache) await idbSet(idbKey(levelId), progress);
 }
 
-export function clearProgress(levelId: string, storage: ProgressStorage = localStorage): void {
-  storage.removeItem(progressKey(levelId));
+export async function clearProgress(
+  levelId: string,
+  cache: Map<string, LevelProgress> = defaultCache,
+): Promise<void> {
+  cache.delete(levelId);
+  if (cache === defaultCache) await idbDelete(idbKey(levelId));
+}
+
+// Call once at app bootstrap, before any scene reads progress.
+export async function loadProgressFromDb(levelIds: string[]): Promise<void> {
+  await Promise.all(
+    levelIds.map(async (levelId) => {
+      const stored = await idbGet<LevelProgress>(idbKey(levelId));
+      if (stored) defaultCache.set(levelId, stored);
+    }),
+  );
 }
