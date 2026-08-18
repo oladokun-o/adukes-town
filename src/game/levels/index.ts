@@ -11,3 +11,11 @@ export function getLevelById(id: string): LevelDef {
   }
   return level;
 }
+
+// null past the last level — callers use that to detect "all levels beaten"
+// rather than wrapping around.
+export function getNextLevel(id: string): LevelDef | null {
+  const index = levels.findIndex((l) => l.id === id);
+  if (index === -1 || index === levels.length - 1) return null;
+  return levels[index + 1];
+}

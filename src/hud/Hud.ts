@@ -5,8 +5,10 @@ import {
   emitGameEvent,
   type GoalProgressPayload,
   type LevelLosePayload,
+  type LevelWinPayload,
   type MovesChangedPayload,
 } from "@/game/events";
+import { getNextLevel } from "@/game/levels";
 import { isRelaxModeEnabled, setRelaxModeEnabled } from "@/settings/relaxMode";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -34,13 +36,14 @@ export class Hud {
   private playAgainBtn = requireElement<HTMLButtonElement>("play-again-btn");
   private relaxModeToggle = requireElement<HTMLInputElement>("relax-mode-toggle");
   private paused = false;
+  private pendingLevelId = "";
 
-  constructor(private readonly restartLevel: () => void) {
+  constructor(private readonly loadLevel: (levelId: string) => void) {
     this.pauseBtn.addEventListener("click", () => this.togglePause());
     this.resumeBtn.addEventListener("click", () => this.togglePause());
     this.playAgainBtn.addEventListener("click", () => {
       this.resultModal.hidden = true;
-      this.restartLevel();
+      this.loadLevel(this.pendingLevelId);
     });
     this.relaxModeToggle.addEventListener("change", () => {
       setRelaxModeEnabled(this.relaxModeToggle.checked);
@@ -67,15 +70,20 @@ export class Hud {
     this.goalEl.textContent = formatGoal(payload);
   };
 
-  private onLevelWin = (): void => {
+  private onLevelWin = (payload: LevelWinPayload): void => {
+    const next = getNextLevel(payload.levelId);
+    this.pendingLevelId = next?.id ?? payload.levelId;
     this.resultTitle.textContent = "You Win!";
-    this.resultProgress.textContent = "";
+    this.resultProgress.textContent = next ? "" : "You've beaten every level!";
+    this.playAgainBtn.textContent = next ? "Next Level" : "Play Again";
     this.resultModal.hidden = false;
   };
 
   private onLevelLose = (payload: LevelLosePayload): void => {
+    this.pendingLevelId = payload.levelId;
     this.resultTitle.textContent = "Level Failed";
     this.resultProgress.textContent = `Progress saved — ${formatGoal(payload)}`;
+    this.playAgainBtn.textContent = "Try Again";
     this.resultModal.hidden = false;
   };
 }
