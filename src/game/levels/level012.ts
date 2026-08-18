@@ -7,5 +7,5 @@ export const level012: LevelDef = {
   height: 7,
   colorCount: 3,
   moveLimit: 12,
-  goal: { targets: { Yellow: 18 } },
+  goal: { targets: { Green: 18 } },
 };
