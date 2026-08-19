@@ -2,8 +2,13 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
 // Relative imports, not the `@/` alias: Vercel's function bundler isn't
 // guaranteed to resolve Vite's tsconfig path mapping the same way Vite does.
-import { normalizeUsername, verifyAccount } from "../src/save/accountAuth";
-import { isSaveBundle, type SaveBundle } from "../src/save/saveBundleSchema";
+// The `.js` extension (not `.ts`) is required even though the source is
+// TypeScript: Vercel's Node.js Function builder transpiles per-file rather
+// than bundling, so the runtime import has to match the compiled output's
+// actual filename under Node's native ESM resolution (package.json has
+// "type": "module", which requires exact, extension-complete specifiers).
+import { normalizeUsername, verifyAccount } from "../src/save/accountAuth.js";
+import { isSaveBundle, type SaveBundle } from "../src/save/saveBundleSchema.js";
 
 const redis = Redis.fromEnv();
 

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
-// Relative import, not the `@/` alias — see api/save.ts for why.
-import { isValidUsername, resolveAccount, type AccountAction } from "../src/save/accountAuth";
+// Relative import with an explicit .js extension — see api/save.ts for why.
+import { isValidUsername, resolveAccount, type AccountAction } from "../src/save/accountAuth.js";
 
 const redis = Redis.fromEnv();
 
