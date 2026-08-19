@@ -23,6 +23,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typescript-eslint/parser": "^8.67.0",
+    "@vercel/node": "^5.10.1",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.23.0",
@@ -40,6 +41,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@upstash/redis": "^1.38.2",
     "idb": "^8.0.3",
     "phaser": "^4.2.1"
   }
