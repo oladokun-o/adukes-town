@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 
@@ -14,6 +15,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1600,
   },
   plugins: [
+    svelte(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon-48.png", "apple-touch-icon.png"],
