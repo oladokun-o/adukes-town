@@ -1,4 +1,5 @@
 import type { PieceType } from "@/game/board/types";
+import { LOSS_CONSOLATION_COINS, computeLevelWinReward } from "@/game/city/rewards";
 import {
   GameEvents,
   onGameEvent,
@@ -8,7 +9,6 @@ import {
   type LevelWinPayload,
   type MovesChangedPayload,
 } from "@/game/events";
-import { getNextLevel } from "@/game/levels";
 import { isRelaxModeEnabled, setRelaxModeEnabled } from "@/settings/relaxMode";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -30,6 +30,7 @@ export class Hud {
   private pauseBtn = requireElement<HTMLButtonElement>("pause-btn");
   private pauseOverlay = requireElement<HTMLDivElement>("pause-overlay");
   private resumeBtn = requireElement<HTMLButtonElement>("resume-btn");
+  private backToTownBtn = requireElement<HTMLButtonElement>("back-to-town-btn");
   private resultModal = requireElement<HTMLDivElement>("result-modal");
   private resultTitle = requireElement<HTMLHeadingElement>("result-title");
   private resultProgress = requireElement<HTMLParagraphElement>("result-progress");
@@ -37,13 +38,22 @@ export class Hud {
   private relaxModeToggle = requireElement<HTMLInputElement>("relax-mode-toggle");
   private paused = false;
   private pendingLevelId = "";
+  private pendingIsWin = false;
 
-  constructor(private readonly loadLevel: (levelId: string) => void) {
+  constructor(
+    private readonly loadLevel: (levelId: string) => void,
+    private readonly onExitToCity: () => void,
+  ) {
     this.pauseBtn.addEventListener("click", () => this.togglePause());
     this.resumeBtn.addEventListener("click", () => this.togglePause());
+    this.backToTownBtn.addEventListener("click", () => this.onExitToCity());
     this.playAgainBtn.addEventListener("click", () => {
       this.resultModal.hidden = true;
-      this.loadLevel(this.pendingLevelId);
+      if (this.pendingIsWin) {
+        this.onExitToCity();
+      } else {
+        this.loadLevel(this.pendingLevelId);
+      }
     });
     this.relaxModeToggle.addEventListener("change", () => {
       setRelaxModeEnabled(this.relaxModeToggle.checked).catch((err: unknown) => {
@@ -73,18 +83,18 @@ export class Hud {
   };
 
   private onLevelWin = (payload: LevelWinPayload): void => {
-    const next = getNextLevel(payload.levelId);
-    this.pendingLevelId = next?.id ?? payload.levelId;
+    this.pendingIsWin = true;
     this.resultTitle.textContent = "You Win!";
-    this.resultProgress.textContent = next ? "" : "You've beaten every level!";
-    this.playAgainBtn.textContent = next ? "Next Level" : "Play Again";
+    this.resultProgress.textContent = `+${computeLevelWinReward(payload.movesRemaining)} coins`;
+    this.playAgainBtn.textContent = "Back to Town";
     this.resultModal.hidden = false;
   };
 
   private onLevelLose = (payload: LevelLosePayload): void => {
+    this.pendingIsWin = false;
     this.pendingLevelId = payload.levelId;
     this.resultTitle.textContent = "Level Failed";
-    this.resultProgress.textContent = `Progress saved — ${formatGoal(payload)}`;
+    this.resultProgress.textContent = `Progress saved — ${formatGoal(payload)} (+${LOSS_CONSOLATION_COINS} coins)`;
     this.playAgainBtn.textContent = "Try Again";
     this.resultModal.hidden = false;
   };

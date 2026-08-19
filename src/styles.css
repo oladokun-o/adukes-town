@@ -11,6 +11,11 @@ body {
     sans-serif;
 }
 
+#city-app {
+  min-height: 100%;
+  overflow-y: auto;
+}
+
 #app {
   position: fixed;
   inset: 0;
@@ -47,6 +52,7 @@ body {
 
 #pause-btn,
 #resume-btn,
+#back-to-town-btn,
 #play-again-btn {
   border: none;
   border-radius: 0.5rem;
@@ -109,4 +115,37 @@ body {
 .relax-mode-label input {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+/* The city (Svelte) and board (Phaser + HUD) views coexist in the DOM and
+   are toggled via body[data-view], set from main.ts. Hidden by default so
+   there's no boot-time flash before the initial view is chosen. These rules
+   are deliberately last in the file so they win same-specificity ties
+   against the #hud/.overlay display declarations above. */
+#app,
+#hud,
+#city-app {
+  display: none;
+}
+
+body[data-view="board"] #app,
+body[data-view="board"] #hud {
+  display: revert;
+}
+
+body[data-view="city"] #city-app {
+  display: block;
+}
+
+/* #pause-overlay/#result-modal keep their own [hidden] toggling from
+   Hud.ts on top of this — they only ever get un-hidden while a level is
+   active, i.e. while data-view="board". */
+#pause-overlay,
+#result-modal {
+  display: none;
+}
+
+body[data-view="board"] #pause-overlay:not([hidden]),
+body[data-view="board"] #result-modal:not([hidden]) {
+  display: flex;
 }

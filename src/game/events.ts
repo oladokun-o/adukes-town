@@ -25,6 +25,7 @@ export interface GoalProgressPayload {
 
 export interface LevelWinPayload {
   levelId: string;
+  movesRemaining: number;
 }
 
 export interface LevelLosePayload {

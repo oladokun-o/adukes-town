@@ -344,7 +344,10 @@ export class BoardScene extends Phaser.Scene {
             clearProgress(this.level.id).catch((err: unknown) => {
               console.warn("Aduke's Town: couldn't clear saved progress.", err);
             });
-            emitGameEvent(GameEvents.LevelWin, { levelId: this.level.id });
+            emitGameEvent(GameEvents.LevelWin, {
+              levelId: this.level.id,
+              movesRemaining: this.movesRemaining,
+            });
           } else if (this.movesRemaining <= 0) {
             this.levelOver = true;
             storeProgress(this.level.id, this.goalProgress).catch((err: unknown) => {
