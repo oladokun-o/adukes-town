@@ -1,11 +1,16 @@
 import Phaser from "phaser";
 import { mountCityApp } from "@/city/mountCityApp";
+import { mountOnboarding } from "@/city/mountOnboarding";
 import { loadCityStateFromDb } from "@/game/city/cityState";
 import { initMatchCoinTie } from "@/game/city/matchTie";
 import { getLevelById, levels } from "@/game/levels";
 import { loadProgressFromDb } from "@/game/levels/progress";
 import { BoardScene } from "@/game/scenes/BoardScene";
 import { Hud } from "@/hud/Hud";
+import { hasLocalAccount, loadAccountFromDb } from "@/save/account";
+import { pushToCloud } from "@/save/cloudSync";
+import { requestPersistentStorage } from "@/save/persist";
+import { loadInstallBannerDismissedFromDb } from "@/settings/installBanner";
 import { loadRelaxModeFromDb } from "@/settings/relaxMode";
 
 // IndexedDB is async, but the very first view boots synchronously off the
@@ -22,10 +27,29 @@ try {
     loadProgressFromDb(levels.map((level) => level.id)),
     loadRelaxModeFromDb(),
     loadCityStateFromDb(),
+    loadInstallBannerDismissedFromDb(),
+    loadAccountFromDb(),
   ]);
 } catch (err) {
   console.warn("Aduke's Town: couldn't load saved progress, starting fresh.", err);
 }
+
+// Doesn't gate anything — it only requests a browser permission that may or
+// may not be grantable, so it runs alongside boot rather than blocking it.
+void requestPersistentStorage();
+
+// Best-effort cloud backstop: push always just mirrors "this device's
+// current state," so it's safe to fire automatically on the way out.
+// Pulling is never automatic outside onboarding's "I already have an
+// account" flow — it could otherwise overwrite newer local progress with
+// stale cloud data. Guarded on hasLocalAccount() since pushing without an
+// account to push to doesn't make sense (e.g. mid-onboarding).
+window.addEventListener("pagehide", () => {
+  if (!hasLocalAccount()) return;
+  pushToCloud().catch((err: unknown) => {
+    console.warn("Aduke's Town: couldn't sync save to the cloud.", err);
+  });
+});
 
 // The city is home; BoardScene is a sub-activity launched on demand.
 const config: Phaser.Types.Core.GameConfig = {
@@ -72,10 +96,31 @@ new Hud(
 
 initMatchCoinTie();
 
-const cityAppEl = document.getElementById("city-app");
-if (!cityAppEl) throw new Error("main: missing #city-app element");
-mountCityApp(cityAppEl, {
-  onPlayMatch3: (levelId) => launchLevel(levelId),
-});
+function requireCityAppEl(): HTMLElement {
+  const el = document.getElementById("city-app");
+  if (!el) throw new Error("main: missing #city-app element");
+  return el;
+}
+
+const cityAppEl = requireCityAppEl();
+
+function mountApp(): void {
+  mountCityApp(cityAppEl, {
+    onPlayMatch3: (levelId) => launchLevel(levelId),
+  });
+}
+
+// Onboarding only shows once — a device with no local account yet. It hands
+// off to the city itself once an account is created or restored.
+if (hasLocalAccount()) {
+  mountApp();
+} else {
+  const unmountOnboarding = mountOnboarding(cityAppEl, {
+    onComplete: () => {
+      unmountOnboarding();
+      mountApp();
+    },
+  });
+}
 
 showCity();

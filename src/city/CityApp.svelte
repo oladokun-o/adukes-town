@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BackupPanel from "@/city/BackupPanel.svelte";
   import {
     cityState,
     collectFactory,
@@ -11,6 +12,7 @@
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
   import Factory from "@/city/Factory.svelte";
+  import InstallBanner from "@/city/InstallBanner.svelte";
   import OrderPanel from "@/city/OrderPanel.svelte";
   import { EXPAND_SECOND_PLOT_COST } from "@/game/city/types";
   import { getNextLevel, levels } from "@/game/levels";
@@ -27,6 +29,8 @@
 </script>
 
 <div class="city">
+  <InstallBanner />
+
   <header>
     <h1>Aduke's Town</h1>
     <CoinBadge coins={$cityState.coins} />
@@ -58,6 +62,11 @@
   <OrderPanel goodsInventory={$cityState.goodsInventory} onFulfill={fulfillOrderAction} />
 
   <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
+
+  <details class="backup-disclosure">
+    <summary>Backup</summary>
+    <BackupPanel />
+  </details>
 </div>
 
 <style>
@@ -112,5 +121,19 @@
     color: #1a1a2e;
     background: #ff8fb3;
     cursor: pointer;
+  }
+
+  .backup-disclosure {
+    font-size: 0.85rem;
+    color: rgba(245, 245, 247, 0.75);
+  }
+
+  .backup-disclosure summary {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .backup-disclosure :global(.backup) {
+    margin-top: 0.75rem;
   }
 </style>
