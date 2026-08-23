@@ -14,10 +14,15 @@
   import Factory from "@/city/Factory.svelte";
   import InstallBanner from "@/city/InstallBanner.svelte";
   import OrderPanel from "@/city/OrderPanel.svelte";
+  import Visit from "@/city/Visit.svelte";
+  import { storyState } from "@/city/visitStore";
   import { EXPAND_SECOND_PLOT_COST } from "@/game/city/types";
   import { getNextLevel, levels } from "@/game/levels";
+  import { getAllFacts } from "@/game/story/dapo";
 
   let { onPlayMatch3 }: { onPlayMatch3: (levelId: string) => void } = $props();
+
+  let view: "home" | "visit-dapo" = $state("home");
 
   function playMatch3(): void {
     const last = $cityState.lastPlayedLevelId;
@@ -26,48 +31,67 @@
   }
 
   let secondPlot = $derived($cityState.plots[1]);
+
+  let dapoHasSomethingToRemember = $derived(
+    getAllFacts("dapo").some(
+      (fact) =>
+        $storyState.characters.dapo.discoveredFactIds.includes(fact.id) &&
+        !$storyState.characters.dapo.actedOnFactIds.includes(fact.id),
+    ),
+  );
 </script>
 
-<div class="city">
-  <InstallBanner />
+{#if view === "visit-dapo"}
+  <Visit onClose={() => (view = "home")} />
+{:else}
+  <div class="city">
+    <InstallBanner />
 
-  <header>
-    <h1>Aduke's Town</h1>
-    <CoinBadge coins={$cityState.coins} />
-  </header>
+    <header>
+      <h1>Aduke's Town</h1>
+      <CoinBadge coins={$cityState.coins} />
+    </header>
 
-  <section class="plots">
-    {#each $cityState.plots as plot (plot.id)}
-      <CropPlot {plot} onPlant={() => plant(plot.id)} onHarvest={() => harvest(plot.id)} />
-    {/each}
-    {#if secondPlot && !secondPlot.unlocked}
-      <button
-        type="button"
-        class="expand-btn"
-        disabled={$cityState.coins < EXPAND_SECOND_PLOT_COST}
-        onclick={expandSecondPlotAction}
-      >
-        Expand: unlock 2nd plot ({EXPAND_SECOND_PLOT_COST} coins)
-      </button>
-    {/if}
-  </section>
+    <section class="plots">
+      {#each $cityState.plots as plot (plot.id)}
+        <CropPlot {plot} onPlant={() => plant(plot.id)} onHarvest={() => harvest(plot.id)} />
+      {/each}
+      {#if secondPlot && !secondPlot.unlocked}
+        <button
+          type="button"
+          class="expand-btn"
+          disabled={$cityState.coins < EXPAND_SECOND_PLOT_COST}
+          onclick={expandSecondPlotAction}
+        >
+          Expand: unlock 2nd plot ({EXPAND_SECOND_PLOT_COST} coins)
+        </button>
+      {/if}
+    </section>
 
-  <Factory
-    cropInventory={$cityState.cropInventory}
-    batch={$cityState.factory.batch}
-    onStart={startFactory}
-    onCollect={collectFactory}
-  />
+    <Factory
+      cropInventory={$cityState.cropInventory}
+      batch={$cityState.factory.batch}
+      onStart={startFactory}
+      onCollect={collectFactory}
+    />
 
-  <OrderPanel goodsInventory={$cityState.goodsInventory} onFulfill={fulfillOrderAction} />
+    <OrderPanel goodsInventory={$cityState.goodsInventory} onFulfill={fulfillOrderAction} />
 
-  <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
+    <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
 
-  <details class="backup-disclosure">
-    <summary>Backup</summary>
-    <BackupPanel />
-  </details>
-</div>
+    <button type="button" class="visit-btn" onclick={() => (view = "visit-dapo")}>
+      Visit Dapo
+      {#if dapoHasSomethingToRemember}
+        <span class="visit-dot" aria-label="Something to remember"></span>
+      {/if}
+    </button>
+
+    <details class="backup-disclosure">
+      <summary>Backup</summary>
+      <BackupPanel />
+    </details>
+  </div>
+{/if}
 
 <style>
   .city {
@@ -121,6 +145,28 @@
     color: #1a1a2e;
     background: #ff8fb3;
     cursor: pointer;
+  }
+
+  .visit-btn {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #f5f5f7;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .visit-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #ff8fb3;
+    margin-left: 0.4rem;
+    vertical-align: middle;
   }
 
   .backup-disclosure {

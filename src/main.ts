@@ -6,6 +6,7 @@ import { initMatchCoinTie } from "@/game/city/matchTie";
 import { getLevelById, levels } from "@/game/levels";
 import { loadProgressFromDb } from "@/game/levels/progress";
 import { BoardScene } from "@/game/scenes/BoardScene";
+import { loadStoryStateFromDb } from "@/game/story/storyState";
 import { Hud } from "@/hud/Hud";
 import { hasLocalAccount, loadAccountFromDb } from "@/save/account";
 import { pushToCloud } from "@/save/cloudSync";
@@ -29,6 +30,7 @@ try {
     loadCityStateFromDb(),
     loadInstallBannerDismissedFromDb(),
     loadAccountFromDb(),
+    loadStoryStateFromDb(),
   ]);
 } catch (err) {
   console.warn("Aduke's Town: couldn't load saved progress, starting fresh.", err);
