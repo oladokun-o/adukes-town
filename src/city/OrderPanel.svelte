@@ -11,6 +11,7 @@
 </script>
 
 <div class="order">
+  <img class="basket-icon" src="/icons/shoppingBasket.png" alt="" />
   <h2>Order</h2>
   <p>Goods in storage: {goodsInventory}</p>
   <button type="button" disabled={goodsInventory < GOODS_PER_ORDER} onclick={onFulfill}>
@@ -20,36 +21,58 @@
 
 <style>
   .order {
-    border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 1rem;
+    background: var(--panel);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12);
     padding: 1rem;
     text-align: center;
   }
 
+  .basket-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-bottom: 0.25rem;
+    filter: brightness(0) saturate(100%) invert(31%) sepia(53%) saturate(3000%) hue-rotate(325deg)
+      brightness(95%);
+  }
+
   h2 {
-    margin: 0 0 0.5rem;
-    font-size: 1rem;
+    margin: 0 0 0.35rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--ink);
   }
 
   p {
     margin: 0 0 0.5rem;
     font-size: 0.9rem;
+    color: var(--ink);
   }
 
   button {
     border: none;
-    border-radius: 0.5rem;
+    border-radius: 999px;
     padding: 0.5rem 1rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #1a1a2e;
-    background: #ff8fb3;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--bloom);
     cursor: pointer;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  button:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
 
   button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+    box-shadow: none;
   }
 </style>

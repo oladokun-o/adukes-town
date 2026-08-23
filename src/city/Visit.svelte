@@ -62,11 +62,17 @@
     gap: 1rem;
   }
 
+  .visit {
+    color: var(--ink);
+  }
+
   .back-btn {
     align-self: flex-start;
     border: none;
     background: transparent;
-    color: rgba(245, 245, 247, 0.75);
+    color: rgba(58, 43, 34, 0.75);
+    font-family: var(--font-body);
+    font-weight: 700;
     font-size: 0.85rem;
     cursor: pointer;
     padding: 0.25rem 0;
@@ -74,31 +80,41 @@
 
   h2 {
     margin: 0;
-    font-size: 1.3rem;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
   }
 
   .dialogue {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 0.75rem;
+    background: var(--panel);
+    border: none;
+    border-radius: 0.9rem;
     padding: 1rem;
     line-height: 1.5;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
   }
 
   .talk-btn {
     align-self: flex-start;
     border: none;
-    border-radius: 0.5rem;
+    border-radius: 999px;
     padding: 0.6rem 1.2rem;
+    font-family: var(--font-display);
     font-size: 0.95rem;
-    font-weight: 700;
-    color: #1a1a2e;
-    background: #ff8fb3;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--bloom);
     cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .talk-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
 
   .remember h3 {
     margin: 0 0 0.5rem;
+    font-family: var(--font-display);
     font-size: 1rem;
   }
 
@@ -109,11 +125,12 @@
     gap: 0.5rem;
     width: 100%;
     text-align: left;
-    border: 1px dashed rgba(255, 255, 255, 0.35);
-    border-radius: 0.75rem;
-    background: transparent;
-    color: #f5f5f7;
+    border: 2px dashed rgba(58, 43, 34, 0.3);
+    border-radius: 0.9rem;
+    background: rgba(255, 246, 233, 0.6);
+    color: var(--ink);
     padding: 0.75rem;
+    font-family: var(--font-body);
     font-size: 0.85rem;
     cursor: pointer;
     margin-bottom: 0.5rem;
@@ -122,7 +139,7 @@
   .reward {
     flex-shrink: 0;
     font-size: 0.75rem;
-    color: rgba(255, 201, 74, 0.9);
+    color: #b57a12;
     font-weight: 700;
   }
 </style>

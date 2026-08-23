@@ -121,7 +121,9 @@
 
   h1 {
     margin: 0;
-    font-size: 1.4rem;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--ink);
     text-align: center;
   }
 
@@ -132,20 +134,19 @@
 
   .mode-toggle button {
     flex: 1;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 0.5rem;
+    border: none;
+    border-radius: 999px;
     padding: 0.5rem;
+    font-family: var(--font-body);
     font-size: 0.85rem;
-    font-weight: 600;
-    color: #f5f5f7;
-    background: transparent;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--panel);
     cursor: pointer;
   }
 
   .mode-toggle button.active {
-    background: #ff8fb3;
-    color: #1a1a2e;
-    border-color: #ff8fb3;
+    background: var(--bloom);
   }
 
   form {
@@ -158,39 +159,51 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+    font-family: var(--font-body);
     font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink);
   }
 
   input {
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.65rem;
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    font-family: var(--font-body);
     font-size: 0.95rem;
-    background: rgba(255, 255, 255, 0.06);
-    color: #f5f5f7;
+    background: var(--panel);
+    color: var(--ink);
   }
 
   .hint {
     margin: 0;
     font-size: 0.8rem;
-    color: rgba(245, 245, 247, 0.7);
+    color: rgba(58, 43, 34, 0.7);
   }
 
   .error {
     margin: 0;
     font-size: 0.85rem;
-    color: #ff8f8f;
+    font-weight: 700;
+    color: #c23b3b;
   }
 
   button[type="submit"] {
     border: none;
-    border-radius: 0.5rem;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
+    border-radius: 999px;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
     font-weight: 700;
-    color: #1a1a2e;
-    background: #ff8fb3;
+    color: var(--ink);
+    background: var(--sun);
     cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  button[type="submit"]:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
 
   button[type="submit"]:disabled {

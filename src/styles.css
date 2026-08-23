@@ -1,19 +1,35 @@
+:root {
+  /* Township-inspired palette — bright and cheerful, not the dark-app-UI
+     default. Chosen for what reads as a genuine mobile city-builder, not
+     tied to any one color's personal significance. */
+  --sky: #8fd3f4;
+  --grass: #8bc96d;
+  --sun: #ffc94a;
+  --bloom: #ff7a9c;
+  --panel: #fff6e9;
+  --ink: #3a2b22;
+
+  --font-display: "Fredoka", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
+  /* The match-3 board keeps its own dark backdrop (set in main.ts's Phaser
+     config) for tile contrast — this background is what shows behind the
+     city view and match-3 chrome. */
   background: #1a1a2e;
   color: #f5f5f7;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-body);
 }
 
 #city-app {
   min-height: 100%;
   overflow-y: auto;
+  background: linear-gradient(to bottom, var(--sky) 0%, var(--sky) 35%, var(--grass) 100%);
+  color: var(--ink);
 }
 
 #app {
@@ -39,11 +55,14 @@ body {
 
 #moves,
 #goal {
-  background: rgba(0, 0, 0, 0.55);
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.75rem;
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-display);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 500;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
 }
 
 #goal {
@@ -55,13 +74,39 @@ body {
 #back-to-town-btn,
 #play-again-btn {
   border: none;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  font-family: var(--font-display);
   font-size: 0.95rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  background: #ff8fb3;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--sun);
   cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
+}
+
+#pause-btn:active,
+#resume-btn:active,
+#back-to-town-btn:active,
+#play-again-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+#pause-btn,
+#back-to-town-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#pause-btn img,
+#back-to-town-btn img {
+  width: 1rem;
+  height: 1rem;
+  /* The source PNGs are white glyphs; these buttons sit on --sun (light),
+     so they're recolored dark via CSS rather than needing a second export. */
+  filter: brightness(0) saturate(100%);
 }
 
 .overlay {
@@ -83,22 +128,26 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  background: #1a1a2e;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.75rem;
+  background: var(--panel);
+  color: var(--ink);
+  border: none;
+  border-radius: 1.25rem;
   padding: 2rem 2.5rem;
   text-align: center;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
 }
 
 .overlay-panel p,
 .overlay-panel h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.25rem;
 }
 
 #result-progress {
+  font-family: var(--font-body);
   font-size: 0.95rem;
-  color: rgba(245, 245, 247, 0.75);
+  color: rgba(58, 43, 34, 0.75);
 }
 
 #result-progress:empty {
