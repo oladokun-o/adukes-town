@@ -60,6 +60,11 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    /* pointer-events is inherited — #city-app (this component's mount
+       ancestor, see styles.css) is pointer-events: none by default, so
+       this needs to explicitly opt back in or Talk/Remember/Back would be
+       unclickable. */
+    pointer-events: auto;
   }
 
   .visit {

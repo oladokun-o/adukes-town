@@ -110,13 +110,27 @@
 </div>
 
 <style>
+  /* Onboarding is a standalone full-screen view — it owns its own backdrop
+     rather than relying on #city-app's (that's now a transparent HUD
+     overlay over the town canvas, see styles.css). */
   .onboarding {
-    max-width: 24rem;
-    margin: 3rem auto;
-    padding: 0 1rem;
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    /* pointer-events is inherited — #city-app (this component's mount
+       parent, see styles.css) is now pointer-events: none by default, so
+       this needs to explicitly opt back in or the whole form would be
+       unclickable. */
+    pointer-events: auto;
+    background: linear-gradient(to bottom, var(--sky) 0%, var(--sky) 35%, var(--grass) 100%);
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 1.25rem;
+    max-width: 24rem;
+    margin: 0 auto;
+    padding: 3rem 1rem;
+    box-sizing: border-box;
   }
 
   h1 {

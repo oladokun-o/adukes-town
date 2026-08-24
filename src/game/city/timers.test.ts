@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isReady, remainingMs, startTimer } from "@/game/city/timers";
+import { cropStage, isReady, remainingMs, startTimer } from "@/game/city/timers";
 
 describe("startTimer", () => {
   it("sets readyAt to now + duration", () => {
@@ -41,5 +41,29 @@ describe("remainingMs", () => {
   it("never goes negative once past readyAt", () => {
     const timer = startTimer(0, 1000);
     expect(remainingMs(timer, 5000)).toBe(0);
+  });
+});
+
+describe("cropStage", () => {
+  it("is null for an empty plot", () => {
+    expect(cropStage(null, 1000)).toBeNull();
+  });
+
+  it("is sprout for the first half of growth", () => {
+    const timer = startTimer(0, 1000);
+    expect(cropStage(timer, 0)).toBe("sprout");
+    expect(cropStage(timer, 499)).toBe("sprout");
+  });
+
+  it("is growing for the second half of growth", () => {
+    const timer = startTimer(0, 1000);
+    expect(cropStage(timer, 500)).toBe("growing");
+    expect(cropStage(timer, 999)).toBe("growing");
+  });
+
+  it("is full once ready", () => {
+    const timer = startTimer(0, 1000);
+    expect(cropStage(timer, 1000)).toBe("full");
+    expect(cropStage(timer, 5000)).toBe("full");
   });
 });

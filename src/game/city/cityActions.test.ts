@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   collectFactoryBatch,
   depositCoins,
-  expandSecondPlot,
   fulfillOrder,
   harvestPlot,
   plantCrop,
   startFactoryBatch,
+  unlockPlot,
 } from "@/game/city/cityActions";
 import {
   COINS_PER_ORDER,
   CROP_GROW_MS,
-  EXPAND_SECOND_PLOT_COST,
   FACTORY_PRODUCE_MS,
   GOODS_PER_ORDER,
   createDefaultCityState,
+  plotUnlockCost,
   type CityState,
 } from "@/game/city/types";
 
@@ -122,26 +122,44 @@ describe("fulfillOrder", () => {
   });
 });
 
-describe("expandSecondPlot", () => {
+describe("unlockPlot", () => {
+  const cost = plotUnlockCost(1); // one plot (plot-1) starts unlocked
+
   it("is a no-op without enough coins", () => {
-    const state = { ...createDefaultCityState(), coins: EXPAND_SECOND_PLOT_COST - 1 };
-    expect(expandSecondPlot(state)).toBe(state);
+    const state = { ...createDefaultCityState(), coins: cost - 1 };
+    expect(unlockPlot(state, "plot-2")).toBe(state);
   });
 
-  it("unlocks the second plot and deducts coins once affordable", () => {
-    const state = { ...createDefaultCityState(), coins: EXPAND_SECOND_PLOT_COST };
-    const next = expandSecondPlot(state);
+  it("unlocks the plot and deducts the cost once affordable", () => {
+    const state = { ...createDefaultCityState(), coins: cost };
+    const next = unlockPlot(state, "plot-2");
     expect(next.plots[1].unlocked).toBe(true);
     expect(next.coins).toBe(0);
   });
 
   it("is a no-op if already unlocked", () => {
-    const unlocked = expandSecondPlot({
-      ...createDefaultCityState(),
-      coins: EXPAND_SECOND_PLOT_COST,
-    });
-    const state = { ...unlocked, coins: EXPAND_SECOND_PLOT_COST };
-    expect(expandSecondPlot(state)).toBe(state);
+    const unlocked = unlockPlot({ ...createDefaultCityState(), coins: cost }, "plot-2");
+    const state = { ...unlocked, coins: cost };
+    expect(unlockPlot(state, "plot-2")).toBe(state);
+  });
+
+  it("is a no-op on an unknown plot id", () => {
+    const state = { ...createDefaultCityState(), coins: cost };
+    expect(unlockPlot(state, "does-not-exist")).toBe(state);
+  });
+
+  it("charges more for each additional plot already unlocked", () => {
+    const firstCost = plotUnlockCost(1);
+    const secondCost = plotUnlockCost(2);
+    expect(secondCost).toBeGreaterThan(firstCost);
+
+    const afterFirst = unlockPlot({ ...createDefaultCityState(), coins: firstCost }, "plot-2");
+    expect(afterFirst.coins).toBe(0);
+
+    const withCoinsForSecond = { ...afterFirst, coins: secondCost };
+    const afterSecond = unlockPlot(withCoinsForSecond, "plot-3");
+    expect(afterSecond.plots[2].unlocked).toBe(true);
+    expect(afterSecond.coins).toBe(0);
   });
 });
 

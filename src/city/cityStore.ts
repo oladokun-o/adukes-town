@@ -1,11 +1,11 @@
 import { writable } from "svelte/store";
 import {
   collectFactoryBatch,
-  expandSecondPlot,
   fulfillOrder,
   harvestPlot,
   plantCrop,
   startFactoryBatch,
+  unlockPlot,
 } from "@/game/city/cityActions";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
 import type { CityState } from "@/game/city/types";
@@ -46,6 +46,6 @@ export function fulfillOrderAction(): void {
   dispatch((state) => fulfillOrder(state));
 }
 
-export function expandSecondPlotAction(): void {
-  dispatch((state) => expandSecondPlot(state));
+export function unlockPlotAction(plotId: string): void {
+  dispatch((state) => unlockPlot(state, plotId));
 }

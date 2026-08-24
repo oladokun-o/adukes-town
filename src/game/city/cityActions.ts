@@ -2,10 +2,10 @@ import {
   COINS_PER_ORDER,
   CROP_GROW_MS,
   CROPS_PER_FACTORY_BATCH,
-  EXPAND_SECOND_PLOT_COST,
   FACTORY_PRODUCE_MS,
   GOODS_PER_FACTORY_BATCH,
   GOODS_PER_ORDER,
+  plotUnlockCost,
   type CityState,
   type PlotState,
 } from "@/game/city/types";
@@ -69,12 +69,15 @@ export function fulfillOrder(state: CityState): CityState {
   };
 }
 
-export function expandSecondPlot(state: CityState): CityState {
-  const secondPlot = state.plots.find((p) => p.id === "plot-2");
-  if (!secondPlot || secondPlot.unlocked || state.coins < EXPAND_SECOND_PLOT_COST) return state;
+export function unlockPlot(state: CityState, plotId: string): CityState {
+  const plot = state.plots.find((p) => p.id === plotId);
+  if (!plot || plot.unlocked) return state;
+  const unlockedCount = state.plots.filter((p) => p.unlocked).length;
+  const cost = plotUnlockCost(unlockedCount);
+  if (state.coins < cost) return state;
   return {
-    ...withPlot(state, "plot-2", (p) => ({ ...p, unlocked: true })),
-    coins: state.coins - EXPAND_SECOND_PLOT_COST,
+    ...withPlot(state, plotId, (p) => ({ ...p, unlocked: true })),
+    coins: state.coins - cost,
   };
 }
 

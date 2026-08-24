@@ -1,15 +1,25 @@
 <script lang="ts">
-  import { isReady, remainingMs } from "@/game/city/timers";
+  import { cropStage, isReady, remainingMs } from "@/game/city/timers";
   import type { PlotState } from "@/game/city/types";
 
   let {
     plot,
     onPlant,
     onHarvest,
+    unlockCost,
+    canAffordUnlock,
+    onUnlock,
   }: {
     plot: PlotState;
     onPlant: () => void;
     onHarvest: () => void;
+    // Only meaningful (and only rendered) while the plot is locked — the
+    // farm grid is generated up front (see FARM_GRID_WIDTH/HEIGHT), so
+    // every locked plot needs its own affordable-unlock affordance rather
+    // than the old single "expand" button.
+    unlockCost?: number;
+    canAffordUnlock?: boolean;
+    onUnlock?: () => void;
   } = $props();
 
   // Local ticking purely to refresh the displayed countdown/growth stage —
@@ -26,20 +36,18 @@
 
   let ready = $derived(isReady(plot.crop, now));
   let secondsLeft = $derived(Math.ceil(remainingMs(plot.crop, now) / 1000));
-  let growthFraction = $derived(
-    plot.crop
-      ? Math.min(1, (now - plot.crop.startedAt) / (plot.crop.readyAt - plot.crop.startedAt))
-      : 0,
-  );
-  let stage: "sprout" | "growing" | "full" = $derived(
-    growthFraction >= 1 ? "full" : growthFraction >= 0.5 ? "growing" : "sprout",
-  );
+  let stage = $derived(cropStage(plot.crop, now));
 </script>
 
 <div class="plot" class:locked={!plot.unlocked}>
   {#if !plot.unlocked}
     <img class="lock-icon" src="/icons/locked.png" alt="" />
     <p>Locked</p>
+    {#if onUnlock}
+      <button type="button" disabled={!canAffordUnlock} onclick={onUnlock}>
+        Unlock for {unlockCost} coins
+      </button>
+    {/if}
   {:else if plot.crop === null}
     <svg class="soil" viewBox="0 0 64 24" aria-hidden="true">
       <ellipse cx="32" cy="16" rx="26" ry="6" fill="#7a5230" />

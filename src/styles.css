@@ -25,11 +25,23 @@ body {
   font-family: var(--font-body);
 }
 
+/* The town itself is drawn by TownScene on the canvas (#app) underneath —
+   #city-app is now a transparent HUD overlay on top of it, the same
+   relationship #hud has to the match-3 board. #city-app comes *before* #app
+   in the DOM (index.html), unlike #hud which comes after — so it needs an
+   explicit stacking order here rather than relying on DOM order like #hud
+   does. pointer-events: none on #city-app itself (not just its .hud child)
+   is required too — without it, this full-viewport wrapper silently
+   captures every tap meant for the canvas underneath, even over areas with
+   no visible HUD content; real interactive pieces (.hud's own children,
+   the .overlay panels) already opt back in with their own pointer-events:
+   auto. */
 #city-app {
-  min-height: 100%;
-  overflow-y: auto;
-  background: linear-gradient(to bottom, var(--sky) 0%, var(--sky) 35%, var(--grass) 100%);
+  position: fixed;
+  inset: 0;
+  z-index: 1;
   color: var(--ink);
+  pointer-events: none;
 }
 
 #app {
@@ -182,8 +194,11 @@ body[data-view="board"] #hud {
   display: revert;
 }
 
+/* The town (TownScene) renders on #app same as the board does — #city-app
+   is the HUD overlay on top of it, same relationship #hud has to the board. */
+body[data-view="city"] #app,
 body[data-view="city"] #city-app {
-  display: block;
+  display: revert;
 }
 
 /* #pause-overlay/#result-modal keep their own [hidden] toggling from

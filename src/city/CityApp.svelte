@@ -1,13 +1,14 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import BackupPanel from "@/city/BackupPanel.svelte";
   import {
     cityState,
     collectFactory,
-    expandSecondPlotAction,
     fulfillOrderAction,
     harvest,
     plant,
     startFactory,
+    unlockPlotAction,
   } from "@/city/cityStore";
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
@@ -16,13 +17,30 @@
   import OrderPanel from "@/city/OrderPanel.svelte";
   import Visit from "@/city/Visit.svelte";
   import { storyState } from "@/city/visitStore";
-  import { EXPAND_SECOND_PLOT_COST } from "@/game/city/types";
+  import { plotUnlockCost } from "@/game/city/types";
+  import { GameEvents, offGameEvent, onGameEvent, type TownTileTappedPayload } from "@/game/events";
   import { getNextLevel, levels } from "@/game/levels";
   import { getAllFacts } from "@/game/story/dapo";
 
   let { onPlayMatch3 }: { onPlayMatch3: (levelId: string) => void } = $props();
 
-  let view: "home" | "visit-dapo" = $state("home");
+  // The town itself is drawn by TownScene on the canvas underneath this
+  // component — CityApp is now a HUD overlay, same relationship Hud.ts has
+  // to BoardScene. Tapping a building/plot on the canvas emits
+  // TownTileTapped; this is what opens the matching detail panel here.
+  let activeTile: TownTileTappedPayload | null = $state(null);
+
+  onMount(() => {
+    const handleTap = (payload: TownTileTappedPayload) => {
+      activeTile = payload;
+    };
+    onGameEvent(GameEvents.TownTileTapped, handleTap);
+    return () => offGameEvent(GameEvents.TownTileTapped, handleTap);
+  });
+
+  function closePanel(): void {
+    activeTile = null;
+  }
 
   function playMatch3(): void {
     const last = $cityState.lastPlayedLevelId;
@@ -30,7 +48,12 @@
     onPlayMatch3(nextLevel.id);
   }
 
-  let secondPlot = $derived($cityState.plots[1]);
+  let activePlot = $derived(
+    activeTile?.kind === "plot"
+      ? ($cityState.plots.find((p) => p.id === activeTile.id) ?? null)
+      : null,
+  );
+  let nextUnlockCost = $derived(plotUnlockCost($cityState.plots.filter((p) => p.unlocked).length));
 
   let dapoHasSomethingToRemember = $derived(
     getAllFacts("dapo").some(
@@ -41,92 +64,86 @@
   );
 </script>
 
-{#if view === "visit-dapo"}
-  <Visit onClose={() => (view = "home")} />
+{#if activeTile?.kind === "npc" && activeTile.id === "dapo"}
+  <Visit onClose={closePanel} />
 {:else}
-  <!-- Decorative background scene — fixed behind the content so the city
-       reads as a place, not a list of cards. Purely presentational. -->
-  <svg class="scene" viewBox="0 0 400 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-    <circle cx="330" cy="40" r="28" fill="#ffe9a8" />
-    <circle cx="330" cy="40" r="20" fill="var(--sun)" />
-    <path
-      d="M0 150 Q60 130 120 148 T240 150 T400 145 L400 220 L0 220 Z"
-      fill="#79b862"
-      opacity="0.9"
-    />
-    <path d="M0 170 Q80 155 160 168 T400 165 L400 220 L0 220 Z" fill="var(--grass)" />
-    <polygon points="40,150 60,120 80,150" fill="#e2a563" />
-    <rect x="45" y="150" width="30" height="16" fill="#c98a4b" />
-    <polygon points="300,148 316,124 332,148" fill="#e0a06a" />
-    <rect x="304" y="148" width="24" height="14" fill="#b87c48" />
-  </svg>
-
-  <div class="city">
-    <InstallBanner />
-
+  <div class="hud">
     <header>
       <h1>Aduke's Town</h1>
       <CoinBadge coins={$cityState.coins} />
     </header>
 
-    <section class="plots">
-      {#each $cityState.plots as plot (plot.id)}
-        <CropPlot {plot} onPlant={() => plant(plot.id)} onHarvest={() => harvest(plot.id)} />
-      {/each}
-      {#if secondPlot && !secondPlot.unlocked}
-        <button
-          type="button"
-          class="expand-btn"
-          disabled={$cityState.coins < EXPAND_SECOND_PLOT_COST}
-          onclick={expandSecondPlotAction}
-        >
-          <img src="/icons/plus.png" alt="" />
-          Expand: unlock 2nd plot ({EXPAND_SECOND_PLOT_COST} coins)
-        </button>
-      {/if}
-    </section>
+    <InstallBanner />
 
-    <Factory
-      cropInventory={$cityState.cropInventory}
-      batch={$cityState.factory.batch}
-      onStart={startFactory}
-      onCollect={collectFactory}
-    />
-
-    <OrderPanel goodsInventory={$cityState.goodsInventory} onFulfill={fulfillOrderAction} />
+    {#if dapoHasSomethingToRemember}
+      <button
+        type="button"
+        class="visit-hint"
+        onclick={() => (activeTile = { kind: "npc", id: "dapo" })}
+      >
+        Dapo has something to say
+        <span class="visit-dot" aria-label="Something to remember"></span>
+      </button>
+    {/if}
 
     <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
-
-    <button type="button" class="visit-btn" onclick={() => (view = "visit-dapo")}>
-      Visit Dapo
-      {#if dapoHasSomethingToRemember}
-        <span class="visit-dot" aria-label="Something to remember"></span>
-      {/if}
-    </button>
 
     <details class="backup-disclosure">
       <summary><img src="/icons/gear.png" alt="" /> Backup</summary>
       <BackupPanel />
     </details>
   </div>
+
+  {#if activePlot}
+    {@const plot = activePlot}
+    <div class="overlay" role="presentation" onclick={closePanel}>
+      <div class="overlay-panel" role="presentation" onclick={(event) => event.stopPropagation()}>
+        <CropPlot
+          {plot}
+          onPlant={() => plant(plot.id)}
+          onHarvest={() => harvest(plot.id)}
+          unlockCost={nextUnlockCost}
+          canAffordUnlock={$cityState.coins >= nextUnlockCost}
+          onUnlock={() => unlockPlotAction(plot.id)}
+        />
+        <button type="button" class="close-btn" onclick={closePanel}>Close</button>
+      </div>
+    </div>
+  {:else if activeTile?.kind === "factory"}
+    <div class="overlay" role="presentation" onclick={closePanel}>
+      <div class="overlay-panel" role="presentation" onclick={(event) => event.stopPropagation()}>
+        <Factory
+          cropInventory={$cityState.cropInventory}
+          batch={$cityState.factory.batch}
+          onStart={startFactory}
+          onCollect={collectFactory}
+        />
+        <button type="button" class="close-btn" onclick={closePanel}>Close</button>
+      </div>
+    </div>
+  {:else if activeTile?.kind === "order"}
+    <div class="overlay" role="presentation" onclick={closePanel}>
+      <div class="overlay-panel" role="presentation" onclick={(event) => event.stopPropagation()}>
+        <OrderPanel goodsInventory={$cityState.goodsInventory} onFulfill={fulfillOrderAction} />
+        <button type="button" class="close-btn" onclick={closePanel}>Close</button>
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
-  .scene {
+  .hud {
     position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-  }
-
-  .city {
-    max-width: 32rem;
-    margin: 0 auto;
-    padding: 1.5rem 1rem 3rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    pointer-events: none;
+  }
+
+  .hud > * {
+    pointer-events: auto;
   }
 
   header {
@@ -138,80 +155,38 @@
   h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     color: var(--ink);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
   }
 
-  .plots {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-
-  .expand-btn {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    border: 2px dashed rgba(58, 43, 34, 0.35);
-    border-radius: 0.9rem;
-    background: rgba(255, 246, 233, 0.6);
-    color: var(--ink);
-    padding: 0.75rem;
-    font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-
-  .expand-btn img {
-    width: 1rem;
-    height: 1rem;
-    filter: brightness(0) saturate(100%);
-  }
-
-  .expand-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
+  .visit-hint,
   .play-btn {
+    align-self: flex-start;
     border: none;
     border-radius: 999px;
-    padding: 0.9rem 1rem;
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--ink);
-    background: var(--bloom);
-    cursor: pointer;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
-  }
-
-  .play-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
-  }
-
-  .visit-btn {
-    position: relative;
-    border: none;
-    border-radius: 999px;
-    padding: 0.75rem 1rem;
+    padding: 0.7rem 1.1rem;
     font-family: var(--font-display);
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--ink);
-    background: var(--panel);
     cursor: pointer;
-    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
   }
 
-  .visit-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+  .visit-hint {
+    background: var(--panel);
+  }
+
+  .play-btn {
+    background: var(--bloom);
+    font-weight: 700;
+  }
+
+  .visit-hint:active,
+  .play-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
 
   .visit-dot {
@@ -225,10 +200,14 @@
   }
 
   .backup-disclosure {
+    margin-top: auto;
+    align-self: flex-start;
     font-family: var(--font-body);
     font-size: 0.85rem;
     color: var(--ink);
-    opacity: 0.85;
+    background: rgba(255, 246, 233, 0.85);
+    border-radius: 0.75rem;
+    padding: 0.4rem 0.6rem;
   }
 
   .backup-disclosure summary {
@@ -248,5 +227,21 @@
 
   .backup-disclosure :global(.backup) {
     margin-top: 0.75rem;
+  }
+
+  .overlay-panel {
+    width: min(22rem, 90vw);
+  }
+
+  .close-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 0.5rem 1.2rem;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: rgba(58, 43, 34, 0.12);
+    cursor: pointer;
   }
 </style>
