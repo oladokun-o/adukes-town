@@ -91,13 +91,22 @@ function normalizeCity(
   const base = createDefaultCityState();
   const level = raw.level ?? 1;
   // Keep any live orders, top the board back up to full with fresh ones.
-  const orders =
-    raw.orders && raw.orders.length > 0
-      ? [
-          ...raw.orders.slice(0, HELI_BOARD_SIZE),
-          ...freshHeliBoard(level).slice(0, Math.max(0, HELI_BOARD_SIZE - raw.orders.length)),
-        ]
-      : base.orders;
+  const seenSeeds = new Set<number>();
+
+  const existingOrders = (raw.orders ?? []).filter((order) => {
+    if (seenSeeds.has(order.seed)) return false;
+    seenSeeds.add(order.seed);
+    return true;
+  });
+
+  const maxSeed = Math.max(...existingOrders.map((order) => order.seed), 0);
+
+  const missingOrders = Math.max(0, HELI_BOARD_SIZE - existingOrders.length);
+
+  const orders = [
+    ...existingOrders.slice(0, HELI_BOARD_SIZE),
+    ...freshHeliBoard(level, maxSeed + 1).slice(0, missingOrders),
+  ];
   return {
     ...base,
     ...raw,
