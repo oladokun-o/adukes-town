@@ -38,10 +38,45 @@ const CROP_ITEMS: CropItemSpec[] = [
   { crop: "cacao", name: "Cacao", icon: "🫘", cropPrice: 190 },
 ];
 
+// Processed goods (factory outputs, incl. intermediates like flour that feed
+// other factories). Kept as a flat list — the chain structure lives in
+// factories.ts recipes.
+interface GoodSpec {
+  id: string;
+  name: string;
+  icon: string;
+  price: number;
+}
+
+const GOODS: GoodSpec[] = [
+  { id: "flour", name: "Flour", icon: "🌾", price: 7 },
+  { id: "bread", name: "Bread", icon: "🍞", price: 20 },
+  { id: "cornbread", name: "Cornbread", icon: "🍞", price: 34 },
+  { id: "feed", name: "Animal Feed", icon: "🌰", price: 9 },
+  { id: "sugar", name: "Sugar", icon: "🍥", price: 28 },
+  { id: "cake", name: "Cake", icon: "🍰", price: 90 },
+  { id: "juice", name: "Berry Juice", icon: "🧃", price: 72 },
+  { id: "jam", name: "Strawberry Jam", icon: "🫙", price: 130 },
+  { id: "thread", name: "Thread", icon: "🧵", price: 48 },
+  { id: "fabric", name: "Fabric", icon: "🧶", price: 110 },
+  { id: "sunhat", name: "Sun Hat", icon: "👒", price: 240 },
+  { id: "tomato_sauce", name: "Tomato Sauce", icon: "🥫", price: 95 },
+  { id: "veggie_soup", name: "Veggie Soup", icon: "🍲", price: 150 },
+  { id: "chocolate", name: "Chocolate", icon: "🍫", price: 300 },
+  { id: "choc_cake", name: "Chocolate Cake", icon: "🎂", price: 520 },
+];
+
 function buildItems(): Record<ItemId, ItemDef> {
-  const items: Record<ItemId, ItemDef> = {
-    good_bread: { id: "good_bread", name: "Bread", kind: "good", icon: "🍞", basePrice: 12 },
-  };
+  const items: Record<ItemId, ItemDef> = {};
+  for (const g of GOODS) {
+    items[`good_${g.id}`] = {
+      id: `good_${g.id}`,
+      name: g.name,
+      kind: "good",
+      icon: g.icon,
+      basePrice: g.price,
+    };
+  }
   for (const { crop, name, icon, cropPrice } of CROP_ITEMS) {
     items[`seed_${crop}`] = {
       id: `seed_${crop}`,

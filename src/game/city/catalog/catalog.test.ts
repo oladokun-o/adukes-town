@@ -38,6 +38,28 @@ describe("catalog integrity", () => {
       for (const id of unlock.recipes ?? []) expect(RECIPES[id]).toBeDefined();
     }
   });
+
+  it("every recipe input is producible — a crop, or another recipe's output", () => {
+    const producible = new Set<string>();
+    for (const crop of Object.values(CROPS)) producible.add(crop.producesItemId);
+    for (const recipe of Object.values(RECIPES)) producible.add(recipe.outputItemId);
+    for (const recipe of Object.values(RECIPES)) {
+      for (const id of Object.keys(recipe.inputs)) {
+        expect(producible.has(id), `${recipe.id} needs unproducible ${id}`).toBe(true);
+      }
+    }
+  });
+
+  it("every recipe input unlocks no later than the recipe itself", () => {
+    for (const recipe of Object.values(RECIPES)) {
+      for (const id of Object.keys(recipe.inputs)) {
+        const crop = Object.values(CROPS).find((c) => c.producesItemId === id);
+        const src = Object.values(RECIPES).find((r) => r.outputItemId === id);
+        const inputUnlock = crop?.unlockLevel ?? src?.unlockLevel ?? 1;
+        expect(inputUnlock, `${recipe.id} input ${id}`).toBeLessThanOrEqual(recipe.unlockLevel);
+      }
+    }
+  });
 });
 
 describe("barnCapacityForLevel", () => {

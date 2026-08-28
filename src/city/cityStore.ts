@@ -1,11 +1,11 @@
 import { derived, writable } from "svelte/store";
 import {
   buyPlot,
-  collectFactoryBatch,
+  collectFactory,
   fulfillOrder,
   harvestPlot,
   plantCrop,
-  startFactoryBatch,
+  queueRecipe,
 } from "@/game/city/cityActions";
 import { barnUsed } from "@/game/city/barn";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
@@ -44,12 +44,12 @@ export function harvest(plotId: string): void {
   dispatch((state, now) => harvestPlot(state, plotId, now));
 }
 
-export function startFactory(factoryId: string, recipeId = "bread"): void {
-  dispatch((state, now) => startFactoryBatch(state, factoryId, recipeId, now));
+export function queueRecipeAction(factoryId: string, recipeId: string): void {
+  dispatch((state, now) => queueRecipe(state, factoryId, recipeId, now));
 }
 
-export function collectFactory(factoryId: string): void {
-  dispatch((state, now) => collectFactoryBatch(state, factoryId, now));
+export function collectFactoryAction(factoryId: string): void {
+  dispatch((state, now) => collectFactory(state, factoryId, now));
 }
 
 export function fulfill(orderId: string): void {

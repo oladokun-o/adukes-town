@@ -7,12 +7,12 @@
     buyPlotAction,
     buySeedAction,
     cityState,
-    collectFactory,
+    collectFactoryAction,
     fulfill,
     harvest,
     plant,
+    queueRecipeAction,
     sellItemAction,
-    startFactory,
     xpMeter,
   } from "@/city/cityStore";
   import CoinBadge from "@/city/CoinBadge.svelte";
@@ -64,11 +64,7 @@
       ? ($cityState.plots.find((p) => p.id === activeTile.id) ?? null)
       : null,
   );
-  let activeFactory = $derived(
-    activeTile?.kind === "factory"
-      ? ($cityState.factories.find((f) => f.id === activeTile.id) ?? null)
-      : null,
-  );
+  let activeFactoryId = $derived(activeTile?.kind === "factory" ? activeTile.id : null);
   let barnFree = $derived(Math.max(0, $barn.capacity - $barn.used));
 </script>
 
@@ -117,13 +113,15 @@
             closePanel();
           }}
         />
-      {:else if activeFactory}
-        {@const factory = activeFactory}
+      {:else if activeFactoryId}
+        {@const fid = activeFactoryId}
         <Factory
-          {factory}
+          factoryId={fid}
+          runtime={$cityState.factories[fid]}
+          level={$cityState.level}
           inventory={$cityState.inventory}
-          onStart={() => startFactory(factory.id)}
-          onCollect={() => collectFactory(factory.id)}
+          onQueue={(recipeId) => queueRecipeAction(fid, recipeId)}
+          onCollect={() => collectFactoryAction(fid)}
         />
       {:else if activeTile.kind === "order"}
         <OrderPanel

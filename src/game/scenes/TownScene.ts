@@ -1,18 +1,11 @@
 import Phaser from "phaser";
+import { factoriesUnlockedAt } from "@/game/city/catalog";
 import { getCityState, onCityStateChange } from "@/game/city/cityState";
 import { cropStage } from "@/game/city/timers";
 import type { CityState } from "@/game/city/types";
 import { emitGameEvent, GameEvents, type TownTileKind } from "@/game/events";
 import { FARM_GRID_WIDTH } from "@/game/town/config";
-import {
-  BARN_GRID_POSITION,
-  gridToScreen,
-  MARKET_STALL_GRID_POSITION,
-  ORDER_BOOTH_GRID_POSITION,
-  plotIdToGrid,
-  TILE_WIDTH,
-  type GridPosition,
-} from "@/game/town/layout";
+import { gridToScreen, plotIdToGrid, TILE_WIDTH, type GridPosition } from "@/game/town/layout";
 
 const ASSET_BASE = "/assets/town/";
 
@@ -64,32 +57,42 @@ interface BuildingSpec {
   tint: number;
 }
 
-const BUILDINGS: BuildingSpec[] = [
-  {
-    pos: BARN_GRID_POSITION,
-    kind: "factory",
-    id: "bakery",
-    emoji: "🏭",
-    label: "Bakery",
-    tint: 0xcdb98f,
-  },
-  {
-    pos: ORDER_BOOTH_GRID_POSITION,
-    kind: "order",
-    id: "order",
-    emoji: "📦",
-    label: "Orders",
-    tint: 0xbfe0ff,
-  },
-  {
-    pos: MARKET_STALL_GRID_POSITION,
-    kind: "market",
-    id: "market",
-    emoji: "🏪",
-    label: "Market",
-    tint: 0xffd9a8,
-  },
-];
+const FACTORY_EMOJI: Record<string, string> = {
+  mill: "🌾",
+  bakery: "🥖",
+  feed_mill: "🌰",
+  sugar_mill: "🍥",
+  textile_mill: "🧵",
+  juice_press: "🧃",
+  tailor: "👒",
+  cannery: "🥫",
+  kitchen: "🍲",
+  confectionery: "🍰",
+  chocolate_maker: "🍫",
+};
+
+// Buildings sit in a 2-wide strip to the right of the farm: factories (in
+// unlock order) first, then the fixed Orders and Market stalls.
+function buildingsFor(level: number): BuildingSpec[] {
+  const col0 = FARM_GRID_WIDTH + 1;
+  const specs: Omit<BuildingSpec, "pos">[] = [
+    ...factoriesUnlockedAt(level)
+      .sort((a, b) => a.unlockLevel - b.unlockLevel)
+      .map((f) => ({
+        kind: "factory" as const,
+        id: f.id,
+        emoji: FACTORY_EMOJI[f.id] ?? "🏭",
+        label: f.name,
+        tint: 0xcdb98f,
+      })),
+    { kind: "order", id: "order", emoji: "📦", label: "Orders", tint: 0xbfe0ff },
+    { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
+  ];
+  return specs.map((s, i) => ({
+    ...s,
+    pos: { col: col0 + (i % 2) * 2, row: Math.floor(i / 2) * 3 },
+  }));
+}
 
 export class TownScene extends Phaser.Scene {
   private cityState!: CityState;
@@ -154,7 +157,7 @@ export class TownScene extends Phaser.Scene {
 
     this.renderFenceLine();
 
-    for (const b of BUILDINGS) this.renderBuilding(b);
+    for (const b of buildingsFor(this.cityState.level)) this.renderBuilding(b);
   }
 
   // The Kenney building sprites in this grab-bag set don't ground-anchor

@@ -1,4 +1,5 @@
-import { createDefaultCityState, type CityState } from "@/game/city/types";
+import { emptyFactory } from "@/game/city/factory";
+import { createDefaultCityState, type CityState, type FactoryRuntime } from "@/game/city/types";
 import {
   SCHEMA_VERSION,
   type AnySaveBundle,
@@ -6,10 +7,14 @@ import {
   type SaveBundle,
 } from "@/save/saveBundleSchema";
 
-// Forward migration for both persisted forms: the bare `city:state`
-// IndexedDB blob (which historically had no version marker) and the
-// SaveBundle file/cloud blob. Everything funnels through migrateCityState,
-// which is idempotent — a v2 value in, a normalized v2 value out.
+// Forward migration for both persisted forms: the bare `city:state` blob
+// (historically unversioned) and the SaveBundle file/cloud blob. Everything
+// funnels through migrateCityState, which is idempotent — a current value
+// in, a normalized current value out.
+//
+// Schema history: v1 = scalar economy; v2 = data-driven catalog + inventory
+// map + XP/level + barn; v3 = per-factory production queue (factories became
+// a { queue, startedAt } map keyed by factoryId).
 
 interface CityEnvelope {
   schemaVersion: number;
@@ -26,7 +31,7 @@ function isEnvelope(raw: unknown): raw is CityEnvelope {
   );
 }
 
-function isV2CityState(raw: unknown): raw is Partial<CityState> {
+function isModernCityState(raw: unknown): raw is Partial<CityState> {
   return typeof raw === "object" && raw !== null && "inventory" in raw && "level" in raw;
 }
 
@@ -34,14 +39,40 @@ function isV1CityState(raw: unknown): raw is CityStateV1 {
   return typeof raw === "object" && raw !== null && "cropInventory" in raw && "factory" in raw;
 }
 
-function normalizeV2(raw: Partial<CityState>): CityState {
+// Accepts: v3 map, v2 array of { id, batch }, or nothing.
+function normalizeFactories(raw: unknown): Record<string, FactoryRuntime> {
+  if (Array.isArray(raw)) {
+    const out: Record<string, FactoryRuntime> = {};
+    for (const entry of raw) {
+      if (!entry || typeof entry !== "object" || typeof entry.id !== "string") continue;
+      const batch = entry.batch as { recipeId: string; timer: { startedAt: number } } | null;
+      out[entry.id] = batch
+        ? { queue: [batch.recipeId], startedAt: batch.timer.startedAt }
+        : emptyFactory();
+    }
+    return out;
+  }
+  if (raw && typeof raw === "object") {
+    const out: Record<string, FactoryRuntime> = {};
+    for (const [id, f] of Object.entries(raw as Record<string, unknown>)) {
+      if (f && typeof f === "object" && Array.isArray((f as FactoryRuntime).queue)) {
+        const fr = f as FactoryRuntime;
+        out[id] = { queue: fr.queue, startedAt: fr.startedAt ?? null };
+      }
+    }
+    return out;
+  }
+  return {};
+}
+
+function normalizeCity(raw: Partial<CityState> & { factories?: unknown }): CityState {
   const base = createDefaultCityState();
   return {
     ...base,
     ...raw,
     inventory: raw.inventory ?? {},
     plots: raw.plots?.length ? raw.plots : base.plots,
-    factories: raw.factories?.length ? raw.factories : base.factories,
+    factories: normalizeFactories(raw.factories),
     orders: raw.orders?.length ? raw.orders : base.orders,
     level: raw.level ?? 1,
     xp: raw.xp ?? 0,
@@ -49,7 +80,7 @@ function normalizeV2(raw: Partial<CityState>): CityState {
   };
 }
 
-function v1ToV2(v1: CityStateV1): CityState {
+function v1ToCurrent(v1: CityStateV1): CityState {
   const base = createDefaultCityState();
   // Carry the starter seeds so a v1 player with no coins isn't stranded
   // once planting costs a seed (Phase 1).
@@ -68,20 +99,17 @@ function v1ToV2(v1: CityStateV1): CityState {
           planting: p.crop ? { cropId: "wheat", timer: p.crop } : null,
         }))
       : base.plots,
-    factories: [
-      {
-        id: "bakery",
-        batch: v1.factory?.batch ? { recipeId: "bread", timer: v1.factory.batch } : null,
-      },
-    ],
+    factories: v1.factory?.batch
+      ? { bakery: { queue: ["bread"], startedAt: v1.factory.batch.startedAt } }
+      : {},
     lastPlayedLevelId: v1.lastPlayedLevelId ?? null,
   };
 }
 
 export function migrateCityState(raw: unknown): CityState {
   if (isEnvelope(raw)) return migrateCityState(raw.state);
-  if (isV2CityState(raw)) return normalizeV2(raw);
-  if (isV1CityState(raw)) return v1ToV2(raw);
+  if (isModernCityState(raw)) return normalizeCity(raw);
+  if (isV1CityState(raw)) return v1ToCurrent(raw);
   return createDefaultCityState();
 }
 

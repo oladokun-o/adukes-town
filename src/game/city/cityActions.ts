@@ -6,8 +6,9 @@ import {
   PLOT_UNLOCK_LEVEL,
 } from "@/game/city/catalog";
 import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
+import { emptyFactory, QUEUE_CAPACITY, settleFactory } from "@/game/city/factory";
 import { isReady, startTimer } from "@/game/city/timers";
-import type { CityState, OrderState, PlotState } from "@/game/city/types";
+import type { CityState, FactoryRuntime, OrderState, PlotState } from "@/game/city/types";
 import { applyXpGain } from "@/game/city/xp";
 
 // Every action here is a guarded, pure state transition: an invalid call
@@ -34,11 +35,12 @@ function withPlot(
 function withFactory(
   state: CityState,
   factoryId: string,
-  update: (factory: CityState["factories"][number]) => CityState["factories"][number],
+  update: (factory: FactoryRuntime) => FactoryRuntime,
 ): CityState {
+  const current = state.factories[factoryId] ?? emptyFactory();
   return {
     ...state,
-    factories: state.factories.map((f) => (f.id === factoryId ? update(f) : f)),
+    factories: { ...state.factories, [factoryId]: update(current) },
   };
 }
 
@@ -74,16 +76,18 @@ export function harvestPlot(state: CityState, plotId: string, now: number): City
   return applyXpGain(stored, crop.xp);
 }
 
-export function startFactoryBatch(
+// Queue a recipe. Inputs are consumed immediately (Township-style); the
+// slot cooks when it reaches the front of the queue.
+export function queueRecipe(
   state: CityState,
   factoryId: string,
   recipeId: string,
   now: number,
 ): CityState {
-  const factory = state.factories.find((f) => f.id === factoryId);
-  if (!factory || factory.batch !== null) return state;
   const recipe = getRecipe(recipeId);
   if (!recipe || recipe.factoryId !== factoryId || recipe.unlockLevel > state.level) return state;
+  const factory = state.factories[factoryId] ?? emptyFactory();
+  if (factory.queue.length >= QUEUE_CAPACITY) return state;
   if (!hasItems(state.inventory, recipe.inputs)) return state;
 
   let inventory = state.inventory;
@@ -91,22 +95,46 @@ export function startFactoryBatch(
     inventory = removeItems(inventory, id, qty);
   }
   return withFactory({ ...state, inventory }, factoryId, (f) => ({
-    ...f,
-    batch: { recipeId, timer: startTimer(now, recipe.produceMs) },
+    queue: [...f.queue, recipeId],
+    startedAt: f.queue.length === 0 ? now : f.startedAt,
   }));
 }
 
-export function collectFactoryBatch(state: CityState, factoryId: string, now: number): CityState {
-  const factory = state.factories.find((f) => f.id === factoryId);
-  if (!factory || factory.batch === null || !isReady(factory.batch.timer, now)) return state;
-  const recipe = getRecipe(factory.batch.recipeId);
-  if (!recipe || barnFree(state) < recipe.outputQty) return state;
-  const cleared = withFactory(state, factoryId, (f) => ({ ...f, batch: null }));
+// Collect every finished slot at once (all-or-nothing: if the barn can't
+// fit the whole batch of finished outputs, it's a no-op — sell something
+// first). Removing the finished slots slides the queue forward; the next
+// slot's clock is already running via the absolute timestamp.
+export function collectFactory(state: CityState, factoryId: string, now: number): CityState {
+  const factory = state.factories[factoryId];
+  if (!factory) return state;
+  const { done, remaining, remainingStartedAt } = settleFactory(factory, now);
+  if (done.length === 0) return state;
+
+  let inventory = state.inventory;
+  let totalOut = 0;
+  let xp = 0;
+  for (const recipeId of done) {
+    const recipe = getRecipe(recipeId);
+    if (!recipe) continue;
+    totalOut += recipe.outputQty;
+    xp += recipe.xp;
+  }
+  if (barnFree(state) < totalOut) return state;
+
+  for (const recipeId of done) {
+    const recipe = getRecipe(recipeId);
+    if (recipe) inventory = addItems(inventory, recipe.outputItemId, recipe.outputQty);
+  }
+
   const stored: CityState = {
-    ...cleared,
-    inventory: addItems(cleared.inventory, recipe.outputItemId, recipe.outputQty),
+    ...state,
+    inventory,
+    factories: {
+      ...state.factories,
+      [factoryId]: { queue: remaining, startedAt: remainingStartedAt },
+    },
   };
-  return applyXpGain(stored, recipe.xp);
+  return applyXpGain(stored, xp);
 }
 
 function nextOrderFor(state: CityState): OrderState {

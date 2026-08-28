@@ -19,9 +19,9 @@ describe("createDefaultCityState", () => {
     expect(state.plots.slice(1).every((p) => !p.unlocked && p.planting === null)).toBe(true);
   });
 
-  it("starts with the level-1 factories idle and one open order", () => {
+  it("starts with no factory queues and one open order", () => {
     const state = createDefaultCityState();
-    expect(state.factories).toEqual([{ id: "bakery", batch: null }]);
+    expect(state.factories).toEqual({});
     expect(state.orders).toHaveLength(1);
     expect(state.orders[0].seed).toBe(1);
     expect(Object.keys(state.orders[0].requires).length).toBeGreaterThan(0);

@@ -17,7 +17,7 @@ const v1City = {
 };
 
 describe("migrateCityState", () => {
-  it("maps a bare v1 city state to the v2 shape", () => {
+  it("maps a bare v1 city state to the current shape", () => {
     const next = migrateCityState(v1City);
     expect(next.coins).toBe(120);
     expect(next.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });
@@ -29,18 +29,30 @@ describe("migrateCityState", () => {
       timer: { startedAt: 0, readyAt: 100 },
     });
     expect(next.plots[1].planting).toBeNull();
-    expect(next.factories).toEqual([
-      { id: "bakery", batch: { recipeId: "bread", timer: { startedAt: 10, readyAt: 20 } } },
-    ]);
+    expect(next.factories).toEqual({ bakery: { queue: ["bread"], startedAt: 10 } });
     expect(next.lastPlayedLevelId).toBe("level005");
   });
 
   it("reads the versioned envelope form", () => {
     const state = { ...createDefaultCityState(), coins: 7 };
-    expect(migrateCityState({ schemaVersion: 2, state }).coins).toBe(7);
+    expect(migrateCityState({ schemaVersion: 3, state }).coins).toBe(7);
   });
 
-  it("is idempotent on an already-v2 state", () => {
+  it("migrates a v2 factory array to the queue map", () => {
+    const v2 = {
+      ...createDefaultCityState(),
+      factories: [
+        { id: "bakery", batch: { recipeId: "bread", timer: { startedAt: 5, readyAt: 9 } } },
+        { id: "mill", batch: null },
+      ],
+    } as unknown;
+    expect(migrateCityState(v2).factories).toEqual({
+      bakery: { queue: ["bread"], startedAt: 5 },
+      mill: { queue: [], startedAt: null },
+    });
+  });
+
+  it("is idempotent on an already-current state", () => {
     const state = { ...createDefaultCityState(), coins: 55, inventory: { crop_wheat: 1 } };
     expect(migrateCityState(state)).toEqual(state);
   });
@@ -52,7 +64,7 @@ describe("migrateCityState", () => {
 });
 
 describe("migrateSaveBundle", () => {
-  it("bumps a v1 bundle to v2 and migrates its city", () => {
+  it("bumps a v1 bundle to the current version and migrates its city", () => {
     const bundle: SaveBundleV1 = {
       schemaVersion: 1,
       progress: { level001: { Red: 3 } },
@@ -60,7 +72,7 @@ describe("migrateSaveBundle", () => {
       city: v1City,
     };
     const next = migrateSaveBundle(bundle);
-    expect(next.schemaVersion).toBe(2);
+    expect(next.schemaVersion).toBe(3);
     expect(next.progress).toEqual({ level001: { Red: 3 } });
     expect(next.relaxMode).toBe(true);
     expect(next.city.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });

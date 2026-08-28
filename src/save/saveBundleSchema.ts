@@ -2,11 +2,11 @@ import type { PieceType } from "@/game/board/types";
 import type { CityState } from "@/game/city/types";
 
 // Bumped when the shape of SaveBundle changes in a way an older export
-// can't be read as-is. v1 → v2 added the data-driven economy (inventory
-// map, XP/level, barn cap, multi-order/multi-factory). Migration lives in
+// can't be read as-is. v1 → v2 added the data-driven economy; v2 → v3 made
+// factories a per-factory production queue. Migration lives in
 // src/save/migrate.ts; every boundary that accepts a bundle (backup import,
 // cloud pull, api/save) migrates on read rather than rejecting old files.
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type LevelProgress = Partial<Record<PieceType, number>>;
 
@@ -28,7 +28,7 @@ export interface SaveBundleV1 {
   city: CityStateV1;
 }
 
-// --- v2 (current) --------------------------------------------------------
+// --- current (v3) -------------------------------------------------------
 
 export interface SaveBundle {
   schemaVersion: number;
@@ -40,9 +40,9 @@ export interface SaveBundle {
 export type AnySaveBundle = SaveBundle | SaveBundleV1;
 
 // Structural guard shared by the client (backup.ts, cloudSync.ts) and the
-// cloud API (api/save.ts). Accepts v1 and v2 — a bundle crossing either
-// boundary is untrusted input worth checking, but an older version is
-// migrated, not refused.
+// cloud API (api/save.ts). Accepts any known version (1..SCHEMA_VERSION) —
+// a bundle crossing either boundary is untrusted input worth checking, but
+// an older version is migrated, not refused.
 export function isSaveBundle(value: unknown): value is AnySaveBundle {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Partial<SaveBundle>;

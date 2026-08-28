@@ -1,21 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
   buyPlot,
-  collectFactoryBatch,
+  collectFactory,
   depositCoins,
   fulfillOrder,
   harvestPlot,
   plantCrop,
-  startFactoryBatch,
+  queueRecipe,
 } from "@/game/city/cityActions";
 import { CROPS, PLOT_COSTS, RECIPES } from "@/game/city/catalog";
+import { QUEUE_CAPACITY } from "@/game/city/factory";
 import { createDefaultCityState, type CityState } from "@/game/city/types";
 
 const WHEAT_MS = CROPS.wheat.growMs;
-const BREAD = RECIPES.bread;
+const FLOUR = RECIPES.flour; // mill: crop_wheat x2 -> good_flour
+const BREAD = RECIPES.bread; // bakery: good_flour x2 -> good_bread
 
 function stocked(inventory: Record<string, number>, extra: Partial<CityState> = {}): CityState {
-  return { ...createDefaultCityState(), inventory, ...extra };
+  // Roomy barn by default so tests exercise the action under test, not the
+  // capacity guard (which has its own dedicated cases).
+  return { ...createDefaultCityState(), barnCapacity: 100_000, inventory, ...extra };
 }
 
 describe("plantCrop", () => {
@@ -75,52 +79,83 @@ describe("harvestPlot", () => {
   });
 });
 
-describe("startFactoryBatch", () => {
+describe("queueRecipe", () => {
   it("is a no-op without the recipe inputs", () => {
-    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat - 1 });
-    expect(startFactoryBatch(state, "bakery", "bread", 0)).toBe(state);
+    const state = stocked({ crop_wheat: FLOUR.inputs.crop_wheat - 1 });
+    expect(queueRecipe(state, "mill", "flour", 0)).toBe(state);
   });
 
-  it("consumes inputs and starts the batch timer", () => {
-    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat });
-    const next = startFactoryBatch(state, "bakery", "bread", 1000);
+  it("consumes inputs and starts the queue's first slot cooking", () => {
+    const state = stocked({ crop_wheat: FLOUR.inputs.crop_wheat });
+    const next = queueRecipe(state, "mill", "flour", 1000);
     expect(next.inventory.crop_wheat).toBeUndefined();
-    expect(next.factories[0].batch).toEqual({
-      recipeId: "bread",
-      timer: { startedAt: 1000, readyAt: 1000 + BREAD.produceMs },
-    });
+    expect(next.factories.mill).toEqual({ queue: ["flour"], startedAt: 1000 });
   });
 
-  it("is a no-op for a wrong-factory recipe or a busy factory", () => {
-    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat });
-    expect(startFactoryBatch(state, "bakery", "not-a-recipe", 0)).toBe(state);
-    const running = startFactoryBatch(state, "bakery", "bread", 0);
-    expect(startFactoryBatch(running, "bakery", "bread", 1000)).toBe(running);
+  it("stacks a second recipe behind the first without resetting the clock", () => {
+    let state = stocked({ crop_wheat: FLOUR.inputs.crop_wheat * 2 });
+    state = queueRecipe(state, "mill", "flour", 1000);
+    state = queueRecipe(state, "mill", "flour", 5000);
+    expect(state.factories.mill).toEqual({ queue: ["flour", "flour"], startedAt: 1000 });
+  });
+
+  it("is a no-op for a wrong-factory recipe, a locked recipe, or a full queue", () => {
+    const state = stocked({ crop_wheat: 999 });
+    expect(queueRecipe(state, "mill", "not-a-recipe", 0)).toBe(state);
+    expect(queueRecipe(state, "mill", "bread", 0)).toBe(state); // bread is bakery's
+    let full = state;
+    for (let i = 0; i < QUEUE_CAPACITY; i++) full = queueRecipe(full, "mill", "flour", 0);
+    expect(queueRecipe(full, "mill", "flour", 1)).toBe(full);
   });
 });
 
-describe("collectFactoryBatch", () => {
-  it("is a no-op before the batch is ready", () => {
-    const running = startFactoryBatch(
-      stocked({ crop_wheat: BREAD.inputs.crop_wheat }),
-      "bakery",
-      "bread",
-      0,
-    );
-    expect(collectFactoryBatch(running, "bakery", BREAD.produceMs - 1)).toBe(running);
+describe("collectFactory", () => {
+  it("is a no-op before the first slot is done", () => {
+    const running = queueRecipe(stocked({ crop_wheat: 999 }), "mill", "flour", 0);
+    expect(collectFactory(running, "mill", FLOUR.produceMs - 1)).toBe(running);
   });
 
-  it("banks the output and grants recipe XP once ready", () => {
-    const running = startFactoryBatch(
-      stocked({ crop_wheat: BREAD.inputs.crop_wheat }),
-      "bakery",
-      "bread",
-      0,
-    );
-    const next = collectFactoryBatch(running, "bakery", BREAD.produceMs);
-    expect(next.factories[0].batch).toBeNull();
-    expect(next.inventory.good_bread).toBe(BREAD.outputQty);
-    expect(next.xp).toBe(BREAD.xp);
+  it("banks finished outputs, grants XP, and slides the queue forward", () => {
+    let state = stocked({ crop_wheat: 999 });
+    state = queueRecipe(state, "mill", "flour", 0);
+    state = queueRecipe(state, "mill", "flour", 0);
+    // first slot done, second still cooking
+    const next = collectFactory(state, "mill", FLOUR.produceMs + 1);
+    expect(next.inventory.good_flour).toBe(FLOUR.outputQty);
+    expect(next.xp).toBe(FLOUR.xp);
+    expect(next.factories.mill.queue).toEqual(["flour"]);
+    expect(next.factories.mill.startedAt).toBe(FLOUR.produceMs);
+  });
+
+  it("collects every finished slot at once", () => {
+    let state = stocked({ crop_wheat: 999 });
+    state = queueRecipe(state, "mill", "flour", 0);
+    state = queueRecipe(state, "mill", "flour", 0);
+    const next = collectFactory(state, "mill", FLOUR.produceMs * 2 + 1);
+    expect(next.inventory.good_flour).toBe(FLOUR.outputQty * 2);
+    expect(next.factories.mill).toEqual({ queue: [], startedAt: null });
+  });
+
+  it("is a no-op (all-or-nothing) when the barn can't fit the whole finished batch", () => {
+    let state = stocked({ crop_wheat: 999 }, { barnCapacity: 999 });
+    state = queueRecipe(state, "mill", "flour", 0);
+    state = { ...state, barnCapacity: 0 };
+    expect(collectFactory(state, "mill", FLOUR.produceMs)).toBe(state);
+  });
+});
+
+// A two-step chain end to end: wheat -> flour (mill) -> bread (bakery).
+describe("production chain", () => {
+  it("mill flour feeds the bakery's bread recipe", () => {
+    let state = stocked({ crop_wheat: 4 });
+    state = queueRecipe(state, "mill", "flour", 0);
+    state = queueRecipe(state, "mill", "flour", 0);
+    state = collectFactory(state, "mill", FLOUR.produceMs * 2);
+    expect(state.inventory.good_flour).toBe(2);
+    state = queueRecipe(state, "bakery", "bread", FLOUR.produceMs * 2);
+    expect(state.inventory.good_flour).toBeUndefined();
+    state = collectFactory(state, "bakery", FLOUR.produceMs * 2 + BREAD.produceMs);
+    expect(state.inventory.good_bread).toBe(BREAD.outputQty);
   });
 });
 
