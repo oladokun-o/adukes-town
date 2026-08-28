@@ -63,7 +63,9 @@ export function createDefaultCityState(): CityState {
     xp: 0,
     level: 1,
     barnCapacity: STARTING_BARN_CAPACITY,
-    inventory: {},
+    // A handful of starter seeds so the farm loop turns before the first
+    // match-3 or order payout.
+    inventory: { seed_wheat: 8 },
     plots: PLOT_LAYOUT.map((id, index) => ({ id, unlocked: index === 0, planting: null })),
     factories: Object.values(FACTORIES)
       .filter((f) => f.unlockLevel <= 1)

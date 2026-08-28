@@ -10,6 +10,12 @@
     <title>Aduke's Town</title>
     <link rel="icon" type="image/png" href="/favicon-48.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -20,7 +26,10 @@
     <div id="hud">
       <span id="moves"></span>
       <span id="goal"></span>
-      <button id="pause-btn" type="button">Pause</button>
+      <button id="pause-btn" type="button">
+        <img src="/icons/pause.png" alt="" />
+        Pause
+      </button>
     </div>
 
     <div id="pause-overlay" class="overlay" hidden>
@@ -31,7 +40,10 @@
           Relax mode (more moves)
         </label>
         <button id="resume-btn" type="button">Resume</button>
-        <button id="back-to-town-btn" type="button">Back to Town</button>
+        <button id="back-to-town-btn" type="button">
+          <img src="/icons/home.png" alt="" />
+          Back to Town
+        </button>
       </div>
     </div>
 

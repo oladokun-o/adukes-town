@@ -9,6 +9,7 @@ import {
 } from "@/game/city/cityActions";
 import { barnUsed } from "@/game/city/barn";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
+import { buySeed, sellItem } from "@/game/city/market";
 import type { CityState } from "@/game/city/types";
 import { xpIntoLevel } from "@/game/city/xp";
 
@@ -35,9 +36,7 @@ function dispatch(action: (state: CityState, now: number) => CityState): void {
   });
 }
 
-// Phase 0 keeps the UI single-crop: cropId / recipeId default to the only
-// content that exists. Phase 1 threads real ids through from the pickers.
-export function plant(plotId: string, cropId = "wheat"): void {
+export function plant(plotId: string, cropId: string): void {
   dispatch((state, now) => plantCrop(state, plotId, cropId, now));
 }
 
@@ -59,4 +58,12 @@ export function fulfill(orderId: string): void {
 
 export function buyPlotAction(plotId: string): void {
   dispatch((state) => buyPlot(state, plotId));
+}
+
+export function buySeedAction(cropId: string, qty: number): void {
+  dispatch((state) => buySeed(state, cropId, qty));
+}
+
+export function sellItemAction(itemId: string, qty: number): void {
+  dispatch((state) => sellItem(state, itemId, qty));
 }

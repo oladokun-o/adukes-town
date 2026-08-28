@@ -1,12 +1,12 @@
 // What each player level grants, plus the economy tunables that used to be
-// loose constants in types.ts. Phase 0 seeds only the first few levels;
-// later phases extend UNLOCKS toward Township parity (~40 levels).
+// loose constants in types.ts. Extended toward Township parity as phases
+// land; balance pass is Phase 9.
 
 export interface LevelUnlock {
   crops?: string[];
   factories?: string[];
   recipes?: string[];
-  // Highest plot index auto-considered "available to buy" at this level.
+  // Highest plot index considered "available to buy" at this level.
   plotsUnlockedTo?: number;
   // Barn capacity floor at this level (monotonic — see barnCapacityForLevel).
   barnCapacity?: number;
@@ -20,20 +20,46 @@ export const XP_BASE = 50;
 export const XP_GROWTH = 1.3;
 export const MAX_LEVEL = 200;
 
-// Plot layout: ordered plot ids. plot-1 starts unlocked; the rest are
-// bought with coins (buyPlot), gated by PLOT_UNLOCK_LEVEL.
-export const PLOT_LAYOUT: string[] = ["plot-1", "plot-2"];
-export const PLOT_COSTS: Record<string, number> = { "plot-2": 50 };
-export const PLOT_UNLOCK_LEVEL: Record<string, number> = { "plot-2": 1 };
+// Field plots: ordered ids. plot-1 starts unlocked; the rest are bought
+// with coins (buyPlot), gated by PLOT_UNLOCK_LEVEL. Rising cost curve.
+const PLOT_SPECS: { cost: number; unlockLevel: number }[] = [
+  { cost: 0, unlockLevel: 1 }, // plot-1, free, pre-unlocked
+  { cost: 50, unlockLevel: 1 },
+  { cost: 100, unlockLevel: 1 },
+  { cost: 200, unlockLevel: 2 },
+  { cost: 350, unlockLevel: 2 },
+  { cost: 550, unlockLevel: 3 },
+  { cost: 800, unlockLevel: 4 },
+  { cost: 1200, unlockLevel: 5 },
+  { cost: 1800, unlockLevel: 6 },
+  { cost: 2600, unlockLevel: 8 },
+  { cost: 3800, unlockLevel: 10 },
+  { cost: 5500, unlockLevel: 12 },
+];
+
+export const PLOT_LAYOUT: string[] = PLOT_SPECS.map((_, i) => `plot-${i + 1}`);
+export const PLOT_COSTS: Record<string, number> = Object.fromEntries(
+  PLOT_SPECS.map((s, i) => [`plot-${i + 1}`, s.cost]).filter(([, cost]) => (cost as number) > 0),
+);
+export const PLOT_UNLOCK_LEVEL: Record<string, number> = Object.fromEntries(
+  PLOT_SPECS.map((s, i) => [`plot-${i + 1}`, s.unlockLevel]),
+);
 
 export const UNLOCKS: Record<number, LevelUnlock> = {
   1: {
     crops: ["wheat"],
     factories: ["bakery"],
     recipes: ["bread"],
-    plotsUnlockedTo: 1,
+    plotsUnlockedTo: 3,
     barnCapacity: 50,
   },
-  2: { barnCapacity: 75 },
-  3: { plotsUnlockedTo: 2, barnCapacity: 100 },
+  2: { crops: ["corn"], plotsUnlockedTo: 5, barnCapacity: 75 },
+  3: { crops: ["carrot"], plotsUnlockedTo: 6, barnCapacity: 100 },
+  4: { crops: ["sugarcane"], plotsUnlockedTo: 7, barnCapacity: 125 },
+  5: { crops: ["cotton"], plotsUnlockedTo: 8, barnCapacity: 150 },
+  6: { crops: ["strawberry"], plotsUnlockedTo: 9, barnCapacity: 175 },
+  7: { crops: ["tomato"], barnCapacity: 200 },
+  8: { crops: ["potato"], plotsUnlockedTo: 10, barnCapacity: 250 },
+  10: { crops: ["pumpkin"], plotsUnlockedTo: 11, barnCapacity: 300 },
+  12: { crops: ["cacao"], plotsUnlockedTo: 12, barnCapacity: 375 },
 };

@@ -1,0 +1,4 @@
+Icons in this folder (locked, unlocked, gear, home, pause, star, shoppingBasket, plus)
+are from Kenney's "Game Icons" pack (https://kenney.nl/assets/game-icons),
+licensed CC0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+Attribution isn't required, but it's good practice to note the source.

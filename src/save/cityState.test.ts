@@ -32,7 +32,7 @@ describe("cityState persistence", () => {
     off();
 
     expect(getCityState().coins).toBe(200);
-    expect(getCityState().inventory).toEqual({ crop_wheat: 3 });
+    expect(getCityState().inventory).toEqual({ seed_wheat: 8, crop_wheat: 3 });
     expect(getCityState().level).toBe(1);
     expect(notified).toBe(200);
   });

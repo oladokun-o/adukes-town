@@ -6,6 +6,7 @@ import { initMatchCoinTie } from "@/game/city/matchTie";
 import { getLevelById, levels } from "@/game/levels";
 import { loadProgressFromDb } from "@/game/levels/progress";
 import { BoardScene } from "@/game/scenes/BoardScene";
+import { TownScene } from "@/game/scenes/TownScene";
 import { Hud } from "@/hud/Hud";
 import { hasLocalAccount, loadAccountFromDb } from "@/save/account";
 import { pushToCloud } from "@/save/cloudSync";
@@ -65,23 +66,35 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 game.scene.add("BoardScene", BoardScene, false);
+game.scene.add("TownScene", TownScene, false);
 
+// #app is `display: none` while the other view is showing, so Phaser's
+// Scale.RESIZE manager sees a 0x0 parent at boot and after every switch —
+// becoming visible via CSS doesn't fire a resize event on its own.
+// `refresh()` alone isn't enough: it computes the new gameSize from the
+// *previously measured* parentSize and only remeasures afterward, so the
+// first call after unhiding #app would still compute a 0x0 size —
+// getParentBounds() has to run first. Both views render into #app, so both
+// need this dance.
+function refreshGameSize(): void {
+  game.scale.getParentBounds();
+  game.scale.refresh();
+}
+
+// BoardScene and TownScene share one canvas (#app) but are two independent
+// Phaser scenes — starting one does not stop the other, so without this both
+// would render concurrently, whichever was added later painting over.
 function showCity(): void {
   document.body.dataset.view = "city";
+  refreshGameSize();
+  if (game.scene.isActive("BoardScene")) game.scene.stop("BoardScene");
+  game.scene.start("TownScene");
 }
 
 function showBoard(): void {
   document.body.dataset.view = "board";
-  // #app is `display: none` while the city view is showing, so Phaser's
-  // Scale.RESIZE manager sees a 0x0 parent at boot and after every switch
-  // back from the city — becoming visible via CSS doesn't fire a resize
-  // event on its own. `refresh()` alone isn't enough: it computes the new
-  // gameSize from the *previously measured* parentSize and only remeasures
-  // afterward, so the first call after unhiding #app would still compute a
-  // 0x0 size — getParentBounds() has to run first to make that measurement
-  // current before refresh() uses it.
-  game.scale.getParentBounds();
-  game.scale.refresh();
+  refreshGameSize();
+  if (game.scene.isActive("TownScene")) game.scene.stop("TownScene");
 }
 
 function launchLevel(levelId: string): void {

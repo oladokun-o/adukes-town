@@ -51,7 +51,9 @@ function normalizeV2(raw: Partial<CityState>): CityState {
 
 function v1ToV2(v1: CityStateV1): CityState {
   const base = createDefaultCityState();
-  const inventory: Record<string, number> = {};
+  // Carry the starter seeds so a v1 player with no coins isn't stranded
+  // once planting costs a seed (Phase 1).
+  const inventory: Record<string, number> = { ...base.inventory };
   if (v1.cropInventory > 0) inventory.crop_wheat = v1.cropInventory;
   if (v1.goodsInventory > 0) inventory.good_bread = v1.goodsInventory;
 

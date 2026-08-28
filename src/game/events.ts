@@ -11,6 +11,7 @@ export const GameEvents = {
   LevelWin: "level:win",
   LevelLose: "level:lose",
   PauseToggle: "pause:toggle",
+  TownTileTapped: "town:tileTapped",
 } as const;
 
 export interface MovesChangedPayload {
@@ -34,12 +35,20 @@ export interface LevelLosePayload {
   targets: Partial<Record<PieceType, number>>;
 }
 
+export type TownTileKind = "plot" | "factory" | "order" | "market";
+
+export interface TownTileTappedPayload {
+  kind: TownTileKind;
+  id: string;
+}
+
 interface GameEventPayloads {
   [GameEvents.MovesChanged]: MovesChangedPayload;
   [GameEvents.GoalProgress]: GoalProgressPayload;
   [GameEvents.LevelWin]: LevelWinPayload;
   [GameEvents.LevelLose]: LevelLosePayload;
   [GameEvents.PauseToggle]: undefined;
+  [GameEvents.TownTileTapped]: TownTileTappedPayload;
 }
 
 type EventArgs<K extends keyof GameEventPayloads> = GameEventPayloads[K] extends undefined

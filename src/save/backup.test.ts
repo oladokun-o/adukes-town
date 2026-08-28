@@ -73,7 +73,7 @@ describe("importSave", () => {
     });
 
     expect(getCityState().coins).toBe(50);
-    expect(getCityState().inventory).toEqual({ crop_wheat: 2, good_bread: 1 });
+    expect(getCityState().inventory).toEqual({ seed_wheat: 8, crop_wheat: 2, good_bread: 1 });
   });
 });
 

@@ -3,12 +3,12 @@ import { STARTING_BARN_CAPACITY } from "@/game/city/catalog";
 import { createDefaultCityState } from "@/game/city/types";
 
 describe("createDefaultCityState", () => {
-  it("starts with an empty inventory, no coins, level 1, and no XP", () => {
+  it("starts with just starter seeds, no coins, level 1, and no XP", () => {
     const state = createDefaultCityState();
     expect(state.coins).toBe(0);
     expect(state.xp).toBe(0);
     expect(state.level).toBe(1);
-    expect(state.inventory).toEqual({});
+    expect(state.inventory).toEqual({ seed_wheat: 8 });
     expect(state.barnCapacity).toBe(STARTING_BARN_CAPACITY);
     expect(state.lastPlayedLevelId).toBeNull();
   });
@@ -35,6 +35,6 @@ describe("createDefaultCityState", () => {
     a.inventory.crop_wheat = 5;
     expect(b.coins).toBe(0);
     expect(b.plots[0].planting).toBeNull();
-    expect(b.inventory).toEqual({});
+    expect(b.inventory).toEqual({ seed_wheat: 8 });
   });
 });

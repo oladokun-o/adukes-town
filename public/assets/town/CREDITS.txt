@@ -1,0 +1,19 @@
+Isometric town tiles — Kenney.nl, CC0 (public domain, no attribution required)
+
+Source packs:
+- Isometric Miniature Bases — https://kenney.nl/assets/isometric-miniature-bases
+- Isometric Miniature Farm — https://kenney.nl/assets/isometric-miniature-farm
+
+Only the sprites actually used in-game were kept (renamed from Kenney's
+original filenames below, all "_S" rotation variant):
+
+  ground-grass.png   <- square_grass_flat_S.png   (Bases)
+  soil.png            <- dirtFarmland_S.png         (Farm)
+  crop-sprout.png      <- cornYoung_S.png            (Farm)
+  crop-growing.png     <- corn_S.png                 (Farm)
+  crop-full.png        <- cornDouble_S.png           (Farm)
+  fence.png            <- fenceLow_S.png             (Farm)
+  wall-door.png        <- woodWallDoorClosed_S.png   (Farm)
+  roof-barn.png        <- roofSingleWall_S.png       (Farm)
+  roof-house.png        <- roofSingle_S.png           (Farm)
+  crate.png             <- sacksCrate_S.png           (Farm)

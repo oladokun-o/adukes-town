@@ -52,10 +52,13 @@ export function plantCrop(
   if (!plot || !plot.unlocked || plot.planting !== null) return state;
   const crop = getCrop(cropId);
   if (!crop || crop.unlockLevel > state.level) return state;
-  return withPlot(state, plotId, (p) => ({
+  // Planting consumes one seed — buy them from the market (market.ts).
+  if (!hasItems(state.inventory, { [crop.seedItemId]: 1 })) return state;
+  const planted = withPlot(state, plotId, (p) => ({
     ...p,
     planting: { cropId, timer: startTimer(now, crop.growMs) },
   }));
+  return { ...planted, inventory: removeItems(planted.inventory, crop.seedItemId, 1) };
 }
 
 export function harvestPlot(state: CityState, plotId: string, now: number): CityState {

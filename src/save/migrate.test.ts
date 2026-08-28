@@ -20,7 +20,7 @@ describe("migrateCityState", () => {
   it("maps a bare v1 city state to the v2 shape", () => {
     const next = migrateCityState(v1City);
     expect(next.coins).toBe(120);
-    expect(next.inventory).toEqual({ crop_wheat: 4, good_bread: 2 });
+    expect(next.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });
     expect(next.level).toBe(1);
     expect(next.xp).toBe(0);
     expect(next.barnCapacity).toBe(STARTING_BARN_CAPACITY);
@@ -63,6 +63,6 @@ describe("migrateSaveBundle", () => {
     expect(next.schemaVersion).toBe(2);
     expect(next.progress).toEqual({ level001: { Red: 3 } });
     expect(next.relaxMode).toBe(true);
-    expect(next.city.inventory).toEqual({ crop_wheat: 4, good_bread: 2 });
+    expect(next.city.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });
   });
 });

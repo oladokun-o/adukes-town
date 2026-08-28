@@ -19,12 +19,19 @@ function stocked(inventory: Record<string, number>, extra: Partial<CityState> = 
 }
 
 describe("plantCrop", () => {
-  it("starts a crop timer on an unlocked, empty plot", () => {
-    const next = plantCrop(createDefaultCityState(), "plot-1", "wheat", 1000);
+  it("starts a crop timer and consumes one seed on an unlocked, empty plot", () => {
+    const start = createDefaultCityState();
+    const next = plantCrop(start, "plot-1", "wheat", 1000);
     expect(next.plots[0].planting).toEqual({
       cropId: "wheat",
       timer: { startedAt: 1000, readyAt: 1000 + WHEAT_MS },
     });
+    expect(next.inventory.seed_wheat).toBe(start.inventory.seed_wheat - 1);
+  });
+
+  it("is a no-op with no seed of that crop", () => {
+    const state = stocked({});
+    expect(plantCrop(state, "plot-1", "wheat", 1000)).toBe(state);
   });
 
   it("is a no-op on a locked plot, an occupied plot, an unknown plot, or an unknown crop", () => {

@@ -41,27 +41,30 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    border-radius: 0.75rem;
-    background: rgba(255, 143, 179, 0.15);
-    border: 1px solid rgba(255, 143, 179, 0.4);
-    padding: 0.75rem;
+    border-radius: 0.9rem;
+    background: var(--panel);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+    padding: 0.75rem 1rem;
   }
 
   p {
     margin: 0;
     flex: 1;
+    font-family: var(--font-body);
     font-size: 0.85rem;
+    color: var(--ink);
   }
 
   button {
     flex-shrink: 0;
     border: none;
-    border-radius: 0.5rem;
-    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem;
+    font-family: var(--font-display);
     font-size: 0.85rem;
-    font-weight: 600;
-    color: #1a1a2e;
-    background: #ff8fb3;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--bloom);
     cursor: pointer;
   }
 </style>

@@ -91,13 +91,14 @@
   }
 
   button {
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(58, 43, 34, 0.25);
     border-radius: 0.5rem;
     padding: 0.4rem 0.75rem;
+    font-family: var(--font-body);
     font-size: 0.85rem;
-    font-weight: 600;
-    color: #f5f5f7;
-    background: transparent;
+    font-weight: 700;
+    color: var(--ink);
+    background: rgba(255, 246, 233, 0.6);
     cursor: pointer;
   }
 
@@ -109,7 +110,7 @@
   .status {
     margin: 0;
     font-size: 0.8rem;
-    color: rgba(245, 245, 247, 0.75);
+    color: rgba(58, 43, 34, 0.75);
     width: 100%;
   }
 </style>
