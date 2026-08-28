@@ -4,7 +4,18 @@
 
 export type ItemId = string;
 
-export type ItemKind = "seed" | "crop" | "good";
+// "material" = building materials from the train; kept in a separate
+// CityState.materials map (no barn pressure, not sellable).
+export type ItemKind = "seed" | "crop" | "good" | "material";
+
+export const MATERIALS: { id: string; name: string; icon: string }[] = [
+  { id: "nail", name: "Nail", icon: "🔩" },
+  { id: "plank", name: "Plank", icon: "🪵" },
+  { id: "bolt", name: "Bolt", icon: "⚙️" },
+  { id: "glue", name: "Glue", icon: "🧴" },
+  { id: "paint", name: "Paint", icon: "🎨" },
+  { id: "brick", name: "Brick", icon: "🧱" },
+];
 
 export interface ItemDef {
   id: ItemId;
@@ -77,6 +88,15 @@ const GOODS: GoodSpec[] = [
 
 function buildItems(): Record<ItemId, ItemDef> {
   const items: Record<ItemId, ItemDef> = {};
+  for (const m of MATERIALS) {
+    items[`mat_${m.id}`] = {
+      id: `mat_${m.id}`,
+      name: m.name,
+      kind: "material",
+      icon: m.icon,
+      basePrice: 0,
+    };
+  }
   for (const g of GOODS) {
     items[`good_${g.id}`] = {
       id: `good_${g.id}`,

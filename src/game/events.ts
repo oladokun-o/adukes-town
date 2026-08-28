@@ -35,7 +35,8 @@ export interface LevelLosePayload {
   targets: Partial<Record<PieceType, number>>;
 }
 
-export type TownTileKind = "plot" | "factory" | "order" | "market" | "animal";
+export type TownTileKind =
+  "plot" | "factory" | "order" | "market" | "animal" | "train" | "plane" | "barn";
 
 export interface TownTileTappedPayload {
   kind: TownTileKind;

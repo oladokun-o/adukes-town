@@ -1,5 +1,10 @@
 import Phaser from "phaser";
-import { animalPensUnlockedAt, factoriesUnlockedAt } from "@/game/city/catalog";
+import {
+  animalPensUnlockedAt,
+  factoriesUnlockedAt,
+  PLANE_UNLOCK_LEVEL,
+  TRAIN_UNLOCK_LEVEL,
+} from "@/game/city/catalog";
 import { getCityState, onCityStateChange } from "@/game/city/cityState";
 import { cropStage } from "@/game/city/timers";
 import type { CityState } from "@/game/city/types";
@@ -94,7 +99,14 @@ function buildingsFor(level: number): BuildingSpec[] {
         label: p.name,
         tint: 0xc7e4a8,
       })),
-    { kind: "order", id: "order", emoji: "📦", label: "Orders", tint: 0xbfe0ff },
+    { kind: "barn", id: "barn", emoji: "🛖", label: "Barn", tint: 0xd8b98a },
+    { kind: "order", id: "order", emoji: "🚁", label: "Orders", tint: 0xbfe0ff },
+    ...(level >= TRAIN_UNLOCK_LEVEL
+      ? [{ kind: "train" as const, id: "train", emoji: "🚂", label: "Train", tint: 0xc9c9c9 }]
+      : []),
+    ...(level >= PLANE_UNLOCK_LEVEL
+      ? [{ kind: "plane" as const, id: "plane", emoji: "✈️", label: "Plane", tint: 0xd7e8ff }]
+      : []),
     { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
   ];
   return specs.map((s, i) => ({

@@ -35,7 +35,7 @@ describe("migrateCityState", () => {
 
   it("reads the versioned envelope form", () => {
     const state = { ...createDefaultCityState(), coins: 7 };
-    expect(migrateCityState({ schemaVersion: 4, state }).coins).toBe(7);
+    expect(migrateCityState({ schemaVersion: 5, state }).coins).toBe(7);
   });
 
   it("migrates a v2 factory array to the queue map", () => {
@@ -72,7 +72,7 @@ describe("migrateSaveBundle", () => {
       city: v1City,
     };
     const next = migrateSaveBundle(bundle);
-    expect(next.schemaVersion).toBe(4);
+    expect(next.schemaVersion).toBe(5);
     expect(next.progress).toEqual({ level001: { Red: 3 } });
     expect(next.relaxMode).toBe(true);
     expect(next.city.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });

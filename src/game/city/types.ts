@@ -1,4 +1,12 @@
-import { generateOrder, PLOT_LAYOUT, STARTING_BARN_CAPACITY } from "@/game/city/catalog";
+import {
+  generateOrder,
+  generatePlaneManifest,
+  generateTrainWagon,
+  HELI_BOARD_SIZE,
+  PLOT_LAYOUT,
+  STARTING_BARN_CAPACITY,
+  TRAIN_WAGON_COUNT,
+} from "@/game/city/catalog";
 import type { ItemId } from "@/game/city/catalog";
 
 export interface Timer {
@@ -43,12 +51,41 @@ export interface OrderState {
   rewardXp: number;
 }
 
+// A train wagon / plane manifest is just a bundle of required items plus the
+// seed it was generated from (so the trip reward is reproducible).
+export interface Manifest {
+  seed: number;
+  requires: Record<ItemId, number>;
+}
+
+// `filled` = wagon indices already loaded. When every wagon is loaded the
+// train leaves (`departedAt` set); after the trip it returns and the reward
+// is collected. `plane` is the same with a single manifest.
+export interface TrainState {
+  wagons: Manifest[];
+  filled: number[];
+  departedAt: number | null;
+}
+
+export interface PlaneState {
+  manifest: Manifest;
+  loaded: boolean;
+  departedAt: number | null;
+}
+
 export interface CityState {
   coins: number;
   xp: number;
   level: number;
   barnCapacity: number;
+  // Extra capacity bought via barn upgrades — kept separate so the
+  // level-based floor (barnCapacityForLevel) can still raise `barnCapacity`
+  // without losing purchased upgrades.
+  barnUpgrades: number;
   inventory: Record<ItemId, number>;
+  // Building materials from the train — separate map, no barn pressure,
+  // not sellable.
+  materials: Record<ItemId, number>;
   plots: PlotState[];
   // Keyed by factoryId, created lazily on first use. Which factories are
   // *available* is derived from `level` (factoriesUnlockedAt), not stored.
@@ -56,18 +93,42 @@ export interface CityState {
   // Keyed by penId, created lazily on first feed. Available pens derive
   // from `level` (animalPensUnlockedAt).
   animals: Record<string, AnimalPenRuntime>;
+  // Helicopter order board — always HELI_BOARD_SIZE entries.
   orders: OrderState[];
+  train: TrainState;
+  plane: PlaneState;
   lastPlayedLevelId: string | null;
 }
 
 // Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 4;
+export const CITY_SCHEMA_VERSION = 5;
 
-function firstOrder(): OrderState {
-  const seed = 1;
-  const spec = generateOrder(seed, 1);
-  return { id: `order-${seed}`, seed, ...spec };
+function orderFromSeed(seed: number, level = 1): OrderState {
+  return { id: `order-${seed}`, seed, ...generateOrder(seed, level) };
+}
+
+export function freshHeliBoard(level = 1, baseSeed = 1): OrderState[] {
+  return Array.from({ length: HELI_BOARD_SIZE }, (_, i) => orderFromSeed(baseSeed + i, level));
+}
+
+export function freshTrain(level = 1, baseSeed = 1): TrainState {
+  return {
+    wagons: Array.from({ length: TRAIN_WAGON_COUNT }, (_, i) => ({
+      seed: baseSeed + i,
+      ...generateTrainWagon(baseSeed + i, level),
+    })),
+    filled: [],
+    departedAt: null,
+  };
+}
+
+export function freshPlane(level = 1, seed = 1): PlaneState {
+  return {
+    manifest: { seed, ...generatePlaneManifest(seed, level) },
+    loaded: false,
+    departedAt: null,
+  };
 }
 
 export function createDefaultCityState(): CityState {
@@ -76,13 +137,17 @@ export function createDefaultCityState(): CityState {
     xp: 0,
     level: 1,
     barnCapacity: STARTING_BARN_CAPACITY,
+    barnUpgrades: 0,
     // A handful of starter seeds so the farm loop turns before the first
     // match-3 or order payout.
     inventory: { seed_wheat: 8 },
+    materials: {},
     plots: PLOT_LAYOUT.map((id, index) => ({ id, unlocked: index === 0, planting: null })),
     factories: {},
     animals: {},
-    orders: [firstOrder()],
+    orders: freshHeliBoard(),
+    train: freshTrain(),
+    plane: freshPlane(),
     lastPlayedLevelId: null,
   };
 }

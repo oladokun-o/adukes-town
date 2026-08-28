@@ -22,7 +22,7 @@ export const MAX_ORDER_ITEM_QTY = 3;
 
 // mulberry32 — tiny, fast, deterministic PRNG. Inlined so the catalog has
 // no dependency surface.
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;
@@ -31,6 +31,36 @@ function mulberry32(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// Shared bundle picker: choose `typeCount` distinct items from `pool` and a
+// per-item quantity. Used for helicopter orders, train wagons, and plane
+// manifests — they differ only in size. Returns the item→qty map plus the
+// summed base-price value.
+export function pickBundle(
+  rand: () => number,
+  pool: ItemId[],
+  opts: { minTypes: number; maxTypes: number; minQty: number; maxQty: number },
+): { requires: Record<ItemId, number>; value: number; totalQty: number } {
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const span = opts.maxTypes - opts.minTypes + 1;
+  const typeCount = Math.min(pool.length, opts.minTypes + Math.floor(rand() * span));
+  const chosen = shuffled.slice(0, Math.max(1, typeCount));
+
+  const requires: Record<ItemId, number> = {};
+  let value = 0;
+  let totalQty = 0;
+  for (const id of chosen) {
+    const qty = opts.minQty + Math.floor(rand() * (opts.maxQty - opts.minQty + 1));
+    requires[id] = qty;
+    value += (ITEMS[id]?.basePrice ?? 0) * qty;
+    totalQty += qty;
+  }
+  return { requires, value, totalQty };
 }
 
 // Items an order may ask for at a given level: raw crops and processed
@@ -50,32 +80,12 @@ export function orderableItemsAt(level: number): ItemId[] {
 }
 
 export function generateOrder(seed: number, level: number): OrderSpec {
-  const rand = mulberry32(seed);
-  const pool = orderableItemsAt(level);
-
-  // Fisher–Yates with the seeded PRNG.
-  const shuffled = [...pool];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  const typeCount = Math.max(
-    1,
-    Math.min(pool.length, 1 + Math.floor(rand() * MAX_ORDER_ITEM_TYPES)),
-  );
-  const chosen = shuffled.slice(0, typeCount);
-
-  const requires: Record<ItemId, number> = {};
-  let value = 0;
-  let totalQty = 0;
-  for (const id of chosen) {
-    const qty = 1 + Math.floor(rand() * MAX_ORDER_ITEM_QTY);
-    requires[id] = qty;
-    value += (ITEMS[id]?.basePrice ?? 0) * qty;
-    totalQty += qty;
-  }
-
+  const { requires, value, totalQty } = pickBundle(mulberry32(seed), orderableItemsAt(level), {
+    minTypes: 1,
+    maxTypes: MAX_ORDER_ITEM_TYPES,
+    minQty: 1,
+    maxQty: MAX_ORDER_ITEM_QTY,
+  });
   return {
     requires,
     rewardCoins: Math.max(1, Math.ceil(value * ORDER_COIN_MARGIN)),

@@ -9,15 +9,22 @@
     cityState,
     collectFactoryAction,
     collectPenAction,
+    collectPlaneAction,
+    collectTrainAction,
     feedPenAction,
     fulfill,
     harvest,
+    loadPlaneAction,
+    loadWagonAction,
     plant,
     queueRecipeAction,
+    rerollOrderAction,
     sellItemAction,
+    upgradeBarnAction,
     xpMeter,
   } from "@/city/cityStore";
   import AnimalPen from "@/city/AnimalPen.svelte";
+  import BarnPanel from "@/city/BarnPanel.svelte";
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
   import Factory from "@/city/Factory.svelte";
@@ -25,6 +32,9 @@
   import LevelBadge from "@/city/LevelBadge.svelte";
   import MarketScreen from "@/city/MarketScreen.svelte";
   import OrderPanel from "@/city/OrderPanel.svelte";
+  import Plane from "@/city/Plane.svelte";
+  import Train from "@/city/Train.svelte";
+  import { barnUsed } from "@/game/city/barn";
   import { PLOT_COSTS, PLOT_UNLOCK_LEVEL } from "@/game/city/catalog";
   import { GameEvents, offGameEvent, onGameEvent, type TownTileTappedPayload } from "@/game/events";
   import { getNextLevel, levels } from "@/game/levels";
@@ -77,7 +87,13 @@
     <div class="badges">
       <LevelBadge level={$xpMeter.level} current={$xpMeter.current} needed={$xpMeter.needed} />
       <CoinBadge coins={$cityState.coins} />
-      <BarnMeter used={$barn.used} capacity={$barn.capacity} />
+      <button
+        type="button"
+        class="badge-btn"
+        onclick={() => (activeTile = { kind: "barn", id: "barn" })}
+      >
+        <BarnMeter used={$barn.used} capacity={$barn.capacity} />
+      </button>
     </div>
   </header>
 
@@ -140,6 +156,30 @@
           orders={$cityState.orders}
           inventory={$cityState.inventory}
           onFulfill={fulfill}
+          onReroll={rerollOrderAction}
+        />
+      {:else if activeTile.kind === "train"}
+        <Train
+          train={$cityState.train}
+          inventory={$cityState.inventory}
+          onLoad={loadWagonAction}
+          onCollect={collectTrainAction}
+        />
+      {:else if activeTile.kind === "plane"}
+        <Plane
+          plane={$cityState.plane}
+          inventory={$cityState.inventory}
+          onLoad={loadPlaneAction}
+          onCollect={collectPlaneAction}
+        />
+      {:else if activeTile.kind === "barn"}
+        <BarnPanel
+          coins={$cityState.coins}
+          barnCapacity={$cityState.barnCapacity}
+          barnUpgrades={$cityState.barnUpgrades}
+          used={barnUsed($cityState.inventory)}
+          materials={$cityState.materials}
+          onUpgrade={upgradeBarnAction}
         />
       {:else if activeTile.kind === "market"}
         <MarketScreen
@@ -189,6 +229,13 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+  }
+
+  .badge-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
   }
 
   .play-btn {

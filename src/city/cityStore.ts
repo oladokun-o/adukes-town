@@ -3,11 +3,17 @@ import {
   buyPlot,
   collectFactory,
   collectPen,
+  collectPlane,
+  collectTrain,
   feedPen,
   fulfillOrder,
   harvestPlot,
+  loadPlane,
+  loadWagon,
   plantCrop,
   queueRecipe,
+  rerollOrder,
+  upgradeBarn,
 } from "@/game/city/cityActions";
 import { barnUsed } from "@/game/city/barn";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
@@ -64,6 +70,30 @@ export function collectPenAction(penId: string): void {
 
 export function fulfill(orderId: string): void {
   dispatch((state) => fulfillOrder(state, orderId));
+}
+
+export function rerollOrderAction(orderId: string): void {
+  dispatch((state) => rerollOrder(state, orderId));
+}
+
+export function loadWagonAction(index: number): void {
+  dispatch((state, now) => loadWagon(state, index, now));
+}
+
+export function collectTrainAction(): void {
+  dispatch((state, now) => collectTrain(state, now));
+}
+
+export function loadPlaneAction(): void {
+  dispatch((state, now) => loadPlane(state, now));
+}
+
+export function collectPlaneAction(): void {
+  dispatch((state, now) => collectPlane(state, now));
+}
+
+export function upgradeBarnAction(): void {
+  dispatch((state) => upgradeBarn(state));
 }
 
 export function buyPlotAction(plotId: string): void {

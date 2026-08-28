@@ -3,20 +3,28 @@ import {
   buyPlot,
   collectFactory,
   collectPen,
+  collectTrain,
   depositCoins,
   feedPen,
   fulfillOrder,
   harvestPlot,
+  loadWagon,
   plantCrop,
   queueRecipe,
+  rerollOrder,
+  upgradeBarn,
 } from "@/game/city/cityActions";
 import {
   ANIMAL_PENS,
+  barnUpgradeCost,
+  BARN_UPGRADE_STEP,
   CROPS,
   penFeedCost,
   penYield,
   PLOT_COSTS,
   RECIPES,
+  TRAIN_TRIP_MS,
+  TRAIN_UNLOCK_LEVEL,
 } from "@/game/city/catalog";
 import { QUEUE_CAPACITY } from "@/game/city/factory";
 import { createDefaultCityState, type CityState } from "@/game/city/types";
@@ -174,15 +182,79 @@ describe("fulfillOrder", () => {
     expect(fulfillOrder(state, state.orders[0].id)).toBe(state);
   });
 
-  it("consumes items, pays coins + XP, and queues a replacement order", () => {
+  it("consumes items, pays coins + XP, and refills the board", () => {
     const base = createDefaultCityState();
     const order = base.orders[0];
     const state = stocked({ ...order.requires });
     const next = fulfillOrder(state, order.id);
     expect(next.coins).toBe(order.rewardCoins);
     expect(next.xp).toBeGreaterThanOrEqual(order.rewardXp);
-    expect(next.orders).toHaveLength(1);
-    expect(next.orders[0].id).not.toBe(order.id);
+    expect(next.orders).toHaveLength(base.orders.length);
+    expect(next.orders.some((o) => o.id === order.id)).toBe(false);
+  });
+
+  it("rerollOrder swaps one order for a fresh one", () => {
+    const state = createDefaultCityState();
+    const id = state.orders[1].id;
+    const next = rerollOrder(state, id);
+    expect(next.orders).toHaveLength(state.orders.length);
+    expect(next.orders.find((o) => o.id === id)).toBeUndefined();
+    expect(rerollOrder(state, "nope")).toBe(state);
+  });
+});
+
+describe("train", () => {
+  function loaded(): CityState {
+    let s = stocked({});
+    // Give exactly what each wagon needs.
+    for (const w of s.train.wagons) {
+      for (const [id, qty] of Object.entries(w.requires)) {
+        s = { ...s, inventory: { ...s.inventory, [id]: (s.inventory[id] ?? 0) + qty } };
+      }
+    }
+    s = { ...s, level: TRAIN_UNLOCK_LEVEL };
+    return s;
+  }
+
+  it("loads wagons; departs once all are full; is a no-op below unlock level", () => {
+    const early = { ...loaded(), level: 1 };
+    expect(loadWagon(early, 0, 0)).toBe(early);
+
+    let s = loaded();
+    for (let i = 0; i < s.train.wagons.length - 1; i++) s = loadWagon(s, i, 1000);
+    expect(s.train.departedAt).toBeNull();
+    s = loadWagon(s, s.train.wagons.length - 1, 2000);
+    expect(s.train.departedAt).toBe(2000);
+    expect(loadWagon(s, 0, 3000)).toBe(s); // already departed
+  });
+
+  it("returns after the trip with materials + coins + a fresh set of wagons", () => {
+    let s = loaded();
+    for (let i = 0; i < s.train.wagons.length; i++) s = loadWagon(s, i, 0);
+    expect(collectTrain(s, TRAIN_TRIP_MS - 1)).toBe(s);
+    const done = collectTrain(s, TRAIN_TRIP_MS);
+    expect(done.coins).toBeGreaterThan(0);
+    expect(Object.keys(done.materials).length).toBeGreaterThan(0);
+    expect(done.train.filled).toEqual([]);
+    expect(done.train.departedAt).toBeNull();
+  });
+});
+
+describe("upgradeBarn", () => {
+  it("spends coins + materials and raises capacity", () => {
+    const cost = barnUpgradeCost(0);
+    const mats: Record<string, number> = {};
+    for (const [id, qty] of Object.entries(cost.materials)) mats[id] = qty;
+    const state = { ...createDefaultCityState(), coins: cost.coins, materials: mats };
+    const next = upgradeBarn(state);
+    expect(next.barnUpgrades).toBe(1);
+    expect(next.barnCapacity).toBe(state.barnCapacity + BARN_UPGRADE_STEP);
+    expect(next.coins).toBe(0);
+  });
+
+  it("is a no-op without the coins", () => {
+    const state = createDefaultCityState();
+    expect(upgradeBarn(state)).toBe(state);
   });
 });
 

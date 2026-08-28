@@ -1,6 +1,10 @@
+import { HELI_BOARD_SIZE } from "@/game/city/catalog";
 import { emptyFactory } from "@/game/city/factory";
 import {
   createDefaultCityState,
+  freshHeliBoard,
+  freshPlane,
+  freshTrain,
   type AnimalPenRuntime,
   type CityState,
   type FactoryRuntime,
@@ -85,15 +89,28 @@ function normalizeCity(
   raw: Partial<CityState> & { factories?: unknown; animals?: unknown },
 ): CityState {
   const base = createDefaultCityState();
+  const level = raw.level ?? 1;
+  // Keep any live orders, top the board back up to full with fresh ones.
+  const orders =
+    raw.orders && raw.orders.length > 0
+      ? [
+          ...raw.orders.slice(0, HELI_BOARD_SIZE),
+          ...freshHeliBoard(level).slice(0, Math.max(0, HELI_BOARD_SIZE - raw.orders.length)),
+        ]
+      : base.orders;
   return {
     ...base,
     ...raw,
     inventory: raw.inventory ?? {},
+    materials: raw.materials ?? {},
+    barnUpgrades: raw.barnUpgrades ?? 0,
     plots: raw.plots?.length ? raw.plots : base.plots,
     factories: normalizeFactories(raw.factories),
     animals: normalizeAnimals(raw.animals),
-    orders: raw.orders?.length ? raw.orders : base.orders,
-    level: raw.level ?? 1,
+    orders,
+    train: raw.train?.wagons?.length ? raw.train : freshTrain(level),
+    plane: raw.plane?.manifest ? raw.plane : freshPlane(level),
+    level,
     xp: raw.xp ?? 0,
     barnCapacity: raw.barnCapacity ?? base.barnCapacity,
   };

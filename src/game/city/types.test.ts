@@ -19,12 +19,15 @@ describe("createDefaultCityState", () => {
     expect(state.plots.slice(1).every((p) => !p.unlocked && p.planting === null)).toBe(true);
   });
 
-  it("starts with no factory queues and one open order", () => {
+  it("starts with no factory queues and a full helicopter board", () => {
     const state = createDefaultCityState();
     expect(state.factories).toEqual({});
-    expect(state.orders).toHaveLength(1);
-    expect(state.orders[0].seed).toBe(1);
+    expect(state.orders).toHaveLength(6);
+    expect(new Set(state.orders.map((o) => o.seed)).size).toBe(6);
     expect(Object.keys(state.orders[0].requires).length).toBeGreaterThan(0);
+    expect(state.train.wagons).toHaveLength(3);
+    expect(state.plane.manifest.requires).toBeTruthy();
+    expect(state.materials).toEqual({});
   });
 
   it("returns an independent object each call, safe to mutate", () => {
