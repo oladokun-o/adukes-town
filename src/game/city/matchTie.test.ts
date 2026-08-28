@@ -1,7 +1,12 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it, vi } from "vitest";
 import { getCityState, storeCityState } from "@/game/city/cityState";
-import { BASE_LEVEL_WIN_COINS, LOSS_CONSOLATION_COINS } from "@/game/city/rewards";
+import {
+  BASE_LEVEL_WIN_COINS,
+  LEVEL_LOSS_XP,
+  LEVEL_WIN_XP,
+  LOSS_CONSOLATION_COINS,
+} from "@/game/city/rewards";
 import { createDefaultCityState } from "@/game/city/types";
 
 // @/game/events pulls in real Phaser (for its EventEmitter), which assumes
@@ -40,6 +45,7 @@ describe("initMatchCoinTie", () => {
     // fire-and-forget idb write); no need to wait for that write to settle.
     emitGameEvent(GameEvents.LevelWin, { levelId: "level003", movesRemaining: 0 });
     expect(getCityState().coins).toBe(BASE_LEVEL_WIN_COINS);
+    expect(getCityState().xp).toBe(LEVEL_WIN_XP);
     expect(getCityState().lastPlayedLevelId).toBe("level003");
   });
 
@@ -52,6 +58,7 @@ describe("initMatchCoinTie", () => {
       targets: {},
     });
     expect(getCityState().coins).toBe(LOSS_CONSOLATION_COINS);
+    expect(getCityState().xp).toBe(LEVEL_LOSS_XP);
     expect(getCityState().lastPlayedLevelId).toBe("level004");
   });
 });

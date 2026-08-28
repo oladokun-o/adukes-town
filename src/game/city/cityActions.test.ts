@@ -1,153 +1,161 @@
 import { describe, expect, it } from "vitest";
 import {
+  buyPlot,
   collectFactoryBatch,
   depositCoins,
-  expandSecondPlot,
   fulfillOrder,
   harvestPlot,
   plantCrop,
   startFactoryBatch,
 } from "@/game/city/cityActions";
-import {
-  COINS_PER_ORDER,
-  CROP_GROW_MS,
-  EXPAND_SECOND_PLOT_COST,
-  FACTORY_PRODUCE_MS,
-  GOODS_PER_ORDER,
-  createDefaultCityState,
-  type CityState,
-} from "@/game/city/types";
+import { CROPS, PLOT_COSTS, RECIPES } from "@/game/city/catalog";
+import { createDefaultCityState, type CityState } from "@/game/city/types";
+
+const WHEAT_MS = CROPS.wheat.growMs;
+const BREAD = RECIPES.bread;
+
+function stocked(inventory: Record<string, number>, extra: Partial<CityState> = {}): CityState {
+  return { ...createDefaultCityState(), inventory, ...extra };
+}
 
 describe("plantCrop", () => {
   it("starts a crop timer on an unlocked, empty plot", () => {
-    const state = createDefaultCityState();
-    const next = plantCrop(state, "plot-1", 1000);
-    expect(next.plots[0].crop).toEqual({ startedAt: 1000, readyAt: 1000 + CROP_GROW_MS });
+    const next = plantCrop(createDefaultCityState(), "plot-1", "wheat", 1000);
+    expect(next.plots[0].planting).toEqual({
+      cropId: "wheat",
+      timer: { startedAt: 1000, readyAt: 1000 + WHEAT_MS },
+    });
   });
 
-  it("is a no-op on a locked plot", () => {
+  it("is a no-op on a locked plot, an occupied plot, an unknown plot, or an unknown crop", () => {
     const state = createDefaultCityState();
-    const next = plantCrop(state, "plot-2", 1000);
-    expect(next).toBe(state);
+    expect(plantCrop(state, "plot-2", "wheat", 1000)).toBe(state);
+    expect(plantCrop(state, "nope", "wheat", 1000)).toBe(state);
+    expect(plantCrop(state, "plot-1", "dragonfruit", 1000)).toBe(state);
+    const planted = plantCrop(state, "plot-1", "wheat", 1000);
+    expect(plantCrop(planted, "plot-1", "wheat", 2000)).toBe(planted);
   });
 
-  it("is a no-op on an already-planted plot", () => {
-    const state = plantCrop(createDefaultCityState(), "plot-1", 1000);
-    const next = plantCrop(state, "plot-1", 2000);
-    expect(next).toBe(state);
-  });
-
-  it("is a no-op on an unknown plot id", () => {
-    const state = createDefaultCityState();
-    expect(plantCrop(state, "does-not-exist", 1000)).toBe(state);
+  it("is a no-op when the crop's unlock level is above the player's", () => {
+    const state = { ...createDefaultCityState(), level: 0 };
+    // wheat unlocks at level 1; a level-0 state can't plant it.
+    expect(plantCrop(state, "plot-1", "wheat", 1000)).toBe(state);
   });
 });
 
 describe("harvestPlot", () => {
   it("is a no-op before the crop is ready", () => {
-    const state = plantCrop(createDefaultCityState(), "plot-1", 0);
-    const next = harvestPlot(state, "plot-1", CROP_GROW_MS - 1);
-    expect(next).toBe(state);
+    const state = plantCrop(createDefaultCityState(), "plot-1", "wheat", 0);
+    expect(harvestPlot(state, "plot-1", WHEAT_MS - 1)).toBe(state);
   });
 
-  it("clears the plot and adds one crop to inventory once ready", () => {
-    const state = plantCrop(createDefaultCityState(), "plot-1", 0);
-    const next = harvestPlot(state, "plot-1", CROP_GROW_MS);
-    expect(next.plots[0].crop).toBeNull();
-    expect(next.cropInventory).toBe(1);
+  it("clears the plot, banks the yield, and grants XP once ready", () => {
+    const state = plantCrop(createDefaultCityState(), "plot-1", "wheat", 0);
+    const next = harvestPlot(state, "plot-1", WHEAT_MS);
+    expect(next.plots[0].planting).toBeNull();
+    expect(next.inventory.crop_wheat).toBe(CROPS.wheat.yield);
+    expect(next.xp).toBe(CROPS.wheat.xp);
   });
 
-  it("is a no-op on an empty plot", () => {
-    const state = createDefaultCityState();
-    expect(harvestPlot(state, "plot-1", 1000)).toBe(state);
+  it("is a no-op when the barn is full", () => {
+    const planted = plantCrop(
+      { ...createDefaultCityState(), barnCapacity: 0 },
+      "plot-1",
+      "wheat",
+      0,
+    );
+    expect(harvestPlot(planted, "plot-1", WHEAT_MS)).toBe(planted);
   });
 });
 
 describe("startFactoryBatch", () => {
-  function withCrops(count: number): CityState {
-    return { ...createDefaultCityState(), cropInventory: count };
-  }
-
-  it("is a no-op without enough crops", () => {
-    const state = withCrops(1);
-    expect(startFactoryBatch(state, 0)).toBe(state);
+  it("is a no-op without the recipe inputs", () => {
+    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat - 1 });
+    expect(startFactoryBatch(state, "bakery", "bread", 0)).toBe(state);
   });
 
-  it("consumes crops and starts a batch timer once there are enough", () => {
-    const state = withCrops(3);
-    const next = startFactoryBatch(state, 1000);
-    expect(next.cropInventory).toBe(0);
-    expect(next.factory.batch).toEqual({ startedAt: 1000, readyAt: 1000 + FACTORY_PRODUCE_MS });
+  it("consumes inputs and starts the batch timer", () => {
+    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat });
+    const next = startFactoryBatch(state, "bakery", "bread", 1000);
+    expect(next.inventory.crop_wheat).toBeUndefined();
+    expect(next.factories[0].batch).toEqual({
+      recipeId: "bread",
+      timer: { startedAt: 1000, readyAt: 1000 + BREAD.produceMs },
+    });
   });
 
-  it("is a no-op while a batch is already running", () => {
-    const running = startFactoryBatch(withCrops(3), 0);
-    const attempt = { ...running, cropInventory: 3 };
-    const next = startFactoryBatch(attempt, 1000);
-    expect(next).toBe(attempt);
+  it("is a no-op for a wrong-factory recipe or a busy factory", () => {
+    const state = stocked({ crop_wheat: BREAD.inputs.crop_wheat });
+    expect(startFactoryBatch(state, "bakery", "not-a-recipe", 0)).toBe(state);
+    const running = startFactoryBatch(state, "bakery", "bread", 0);
+    expect(startFactoryBatch(running, "bakery", "bread", 1000)).toBe(running);
   });
 });
 
 describe("collectFactoryBatch", () => {
   it("is a no-op before the batch is ready", () => {
-    const state = startFactoryBatch({ ...createDefaultCityState(), cropInventory: 3 }, 0);
-    const next = collectFactoryBatch(state, FACTORY_PRODUCE_MS - 1);
-    expect(next).toBe(state);
+    const running = startFactoryBatch(
+      stocked({ crop_wheat: BREAD.inputs.crop_wheat }),
+      "bakery",
+      "bread",
+      0,
+    );
+    expect(collectFactoryBatch(running, "bakery", BREAD.produceMs - 1)).toBe(running);
   });
 
-  it("clears the batch and adds goods to inventory once ready", () => {
-    const state = startFactoryBatch({ ...createDefaultCityState(), cropInventory: 3 }, 0);
-    const next = collectFactoryBatch(state, FACTORY_PRODUCE_MS);
-    expect(next.factory.batch).toBeNull();
-    expect(next.goodsInventory).toBe(1);
-  });
-
-  it("is a no-op when the factory is idle", () => {
-    const state = createDefaultCityState();
-    expect(collectFactoryBatch(state, 1000)).toBe(state);
+  it("banks the output and grants recipe XP once ready", () => {
+    const running = startFactoryBatch(
+      stocked({ crop_wheat: BREAD.inputs.crop_wheat }),
+      "bakery",
+      "bread",
+      0,
+    );
+    const next = collectFactoryBatch(running, "bakery", BREAD.produceMs);
+    expect(next.factories[0].batch).toBeNull();
+    expect(next.inventory.good_bread).toBe(BREAD.outputQty);
+    expect(next.xp).toBe(BREAD.xp);
   });
 });
 
 describe("fulfillOrder", () => {
-  it("is a no-op without enough goods", () => {
-    const state = { ...createDefaultCityState(), goodsInventory: GOODS_PER_ORDER - 1 };
-    expect(fulfillOrder(state)).toBe(state);
+  it("is a no-op without the required items", () => {
+    const state = createDefaultCityState();
+    expect(fulfillOrder(state, state.orders[0].id)).toBe(state);
   });
 
-  it("consumes goods and pays out coins once there are enough", () => {
-    const state = { ...createDefaultCityState(), goodsInventory: GOODS_PER_ORDER };
-    const next = fulfillOrder(state);
-    expect(next.goodsInventory).toBe(0);
-    expect(next.coins).toBe(COINS_PER_ORDER);
+  it("consumes items, pays coins + XP, and queues a replacement order", () => {
+    const base = createDefaultCityState();
+    const order = base.orders[0];
+    const state = stocked({ ...order.requires });
+    const next = fulfillOrder(state, order.id);
+    expect(next.coins).toBe(order.rewardCoins);
+    expect(next.xp).toBeGreaterThanOrEqual(order.rewardXp);
+    expect(next.orders).toHaveLength(1);
+    expect(next.orders[0].id).not.toBe(order.id);
   });
 });
 
-describe("expandSecondPlot", () => {
-  it("is a no-op without enough coins", () => {
-    const state = { ...createDefaultCityState(), coins: EXPAND_SECOND_PLOT_COST - 1 };
-    expect(expandSecondPlot(state)).toBe(state);
-  });
-
-  it("unlocks the second plot and deducts coins once affordable", () => {
-    const state = { ...createDefaultCityState(), coins: EXPAND_SECOND_PLOT_COST };
-    const next = expandSecondPlot(state);
+describe("buyPlot", () => {
+  it("unlocks a locked plot and deducts its cost", () => {
+    const state = { ...createDefaultCityState(), coins: PLOT_COSTS["plot-2"] };
+    const next = buyPlot(state, "plot-2");
     expect(next.plots[1].unlocked).toBe(true);
     expect(next.coins).toBe(0);
   });
 
-  it("is a no-op if already unlocked", () => {
-    const unlocked = expandSecondPlot({
-      ...createDefaultCityState(),
-      coins: EXPAND_SECOND_PLOT_COST,
-    });
-    const state = { ...unlocked, coins: EXPAND_SECOND_PLOT_COST };
-    expect(expandSecondPlot(state)).toBe(state);
+  it("is a no-op without the coins, for an unknown plot, or an already-unlocked plot", () => {
+    const broke = { ...createDefaultCityState(), coins: PLOT_COSTS["plot-2"] - 1 };
+    expect(buyPlot(broke, "plot-2")).toBe(broke);
+    const state = createDefaultCityState();
+    expect(buyPlot(state, "plot-1")).toBe(state);
+    expect(buyPlot(state, "nope")).toBe(state);
   });
 });
 
 describe("depositCoins", () => {
-  it("adds the amount to the coin balance", () => {
+  it("adds the amount, ignoring non-positive values", () => {
     const state = createDefaultCityState();
     expect(depositCoins(state, 42).coins).toBe(42);
+    expect(depositCoins(state, 0)).toBe(state);
   });
 });

@@ -1,47 +1,74 @@
+import { FACTORIES, generateOrder, PLOT_LAYOUT, STARTING_BARN_CAPACITY } from "@/game/city/catalog";
+import type { ItemId } from "@/game/city/catalog";
+
 export interface Timer {
   startedAt: number;
   readyAt: number;
 }
 
+export interface Planting {
+  cropId: string;
+  timer: Timer;
+}
+
 export interface PlotState {
   id: string;
   unlocked: boolean;
-  crop: Timer | null;
+  planting: Planting | null;
+}
+
+export interface FactoryBatch {
+  recipeId: string;
+  timer: Timer;
 }
 
 export interface FactoryState {
-  batch: Timer | null;
+  id: string;
+  batch: FactoryBatch | null;
+}
+
+export interface OrderState {
+  id: string;
+  seed: number;
+  requires: Record<ItemId, number>;
+  rewardCoins: number;
+  rewardXp: number;
 }
 
 export interface CityState {
   coins: number;
+  xp: number;
+  level: number;
+  barnCapacity: number;
+  inventory: Record<ItemId, number>;
   plots: PlotState[];
-  cropInventory: number;
-  factory: FactoryState;
-  goodsInventory: number;
+  factories: FactoryState[];
+  orders: OrderState[];
   lastPlayedLevelId: string | null;
 }
 
-// Tunable economy constants for the minimal Stage 2 loop — starting values,
-// expect to retune once this is actually played.
-export const CROP_GROW_MS = 60_000;
-export const FACTORY_PRODUCE_MS = 90_000;
-export const CROPS_PER_FACTORY_BATCH = 3;
-export const GOODS_PER_FACTORY_BATCH = 1;
-export const GOODS_PER_ORDER = 2;
-export const COINS_PER_ORDER = 25;
-export const EXPAND_SECOND_PLOT_COST = 50;
+// Envelope version for the persisted city blob (see src/save/cityState.ts).
+// Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
+export const CITY_SCHEMA_VERSION = 2;
+
+function firstOrder(): OrderState {
+  const seed = 1;
+  const spec = generateOrder(seed, 1);
+  return { id: `order-${seed}`, seed, ...spec };
+}
 
 export function createDefaultCityState(): CityState {
   return {
     coins: 0,
-    plots: [
-      { id: "plot-1", unlocked: true, crop: null },
-      { id: "plot-2", unlocked: false, crop: null },
-    ],
-    cropInventory: 0,
-    factory: { batch: null },
-    goodsInventory: 0,
+    xp: 0,
+    level: 1,
+    barnCapacity: STARTING_BARN_CAPACITY,
+    inventory: {},
+    plots: PLOT_LAYOUT.map((id, index) => ({ id, unlocked: index === 0, planting: null })),
+    factories: Object.values(FACTORIES)
+      .filter((f) => f.unlockLevel <= 1)
+      .map((f) => ({ id: f.id, batch: null })),
+    orders: [firstOrder()],
     lastPlayedLevelId: null,
   };
 }

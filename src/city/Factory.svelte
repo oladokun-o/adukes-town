@@ -1,18 +1,22 @@
 <script lang="ts">
+  import { getItem, getRecipe } from "@/game/city/catalog";
   import { isReady, remainingMs } from "@/game/city/timers";
-  import { CROPS_PER_FACTORY_BATCH, type Timer } from "@/game/city/types";
+  import type { FactoryState } from "@/game/city/types";
 
   let {
-    cropInventory,
-    batch,
+    factory,
+    inventory,
     onStart,
     onCollect,
   }: {
-    cropInventory: number;
-    batch: Timer | null;
+    factory: FactoryState;
+    inventory: Record<string, number>;
     onStart: () => void;
     onCollect: () => void;
   } = $props();
+
+  // Phase 0: one recipe per factory. Phase 2 adds a recipe picker.
+  const recipe = getRecipe("bread");
 
   let now = $state(Date.now());
   $effect(() => {
@@ -22,16 +26,25 @@
     return () => clearInterval(id);
   });
 
-  let ready = $derived(isReady(batch, now));
-  let secondsLeft = $derived(Math.ceil(remainingMs(batch, now) / 1000));
+  let ready = $derived(isReady(factory.batch?.timer ?? null, now));
+  let secondsLeft = $derived(Math.ceil(remainingMs(factory.batch?.timer ?? null, now) / 1000));
+  let canStart = $derived(
+    !!recipe && Object.entries(recipe.inputs).every(([id, qty]) => (inventory[id] ?? 0) >= qty),
+  );
+  let inputLabel = $derived(
+    recipe
+      ? Object.entries(recipe.inputs)
+          .map(([id, qty]) => `${qty} ${getItem(id)?.name ?? id}`)
+          .join(", ")
+      : "",
+  );
 </script>
 
 <div class="factory">
-  <h2>Factory</h2>
-  <p>Crops in storage: {cropInventory}</p>
-  {#if batch === null}
-    <button type="button" disabled={cropInventory < CROPS_PER_FACTORY_BATCH} onclick={onStart}>
-      Start batch ({CROPS_PER_FACTORY_BATCH} crops)
+  <h2>{recipe?.name ?? factory.id} factory</h2>
+  {#if factory.batch === null}
+    <button type="button" disabled={!canStart} onclick={onStart}>
+      Start batch ({inputLabel})
     </button>
   {:else if ready}
     <button type="button" class="ready" onclick={onCollect}>Collect goods!</button>
@@ -52,6 +65,7 @@
   h2 {
     margin: 0 0 0.5rem;
     font-size: 1rem;
+    text-transform: capitalize;
   }
 
   p {

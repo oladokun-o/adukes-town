@@ -94,6 +94,25 @@ describe("api/save", () => {
     expect(getRes.json).toHaveBeenCalledWith(bundle);
   });
 
+  it("round-trips a current (v2) bundle", async () => {
+    const bundle = {
+      schemaVersion: 2,
+      progress: {},
+      relaxMode: false,
+      city: createDefaultCityState(),
+    };
+    const putRes = mockRes();
+    await call(
+      mockReq({ method: "PUT", headers: ACCOUNT_HEADERS, body: bundle }) as never,
+      putRes as never,
+    );
+    expect(putRes.status).toHaveBeenCalledWith(200);
+
+    const getRes = mockRes();
+    await call(mockReq({ headers: ACCOUNT_HEADERS }) as never, getRes as never);
+    expect(getRes.json).toHaveBeenCalledWith(bundle);
+  });
+
   it("rejects a malformed body on PUT", async () => {
     const res = mockRes();
     await call(

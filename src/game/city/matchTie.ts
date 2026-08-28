@@ -1,12 +1,19 @@
 import { depositCoins } from "@/game/city/cityActions";
 import { getCityState, storeCityState } from "@/game/city/cityState";
-import { computeLevelWinReward, LOSS_CONSOLATION_COINS } from "@/game/city/rewards";
+import {
+  computeLevelWinReward,
+  LEVEL_LOSS_XP,
+  LEVEL_WIN_XP,
+  LOSS_CONSOLATION_COINS,
+} from "@/game/city/rewards";
 import type { CityState } from "@/game/city/types";
+import { applyXpGain } from "@/game/city/xp";
 import { GameEvents, onGameEvent } from "@/game/events";
 
-function awardCoins(levelId: string, amount: number): void {
-  const withCoins = depositCoins(getCityState(), amount);
-  const next: CityState = { ...withCoins, lastPlayedLevelId: levelId };
+function award(levelId: string, coins: number, xp: number): void {
+  const withCoins = depositCoins(getCityState(), coins);
+  const withXp = applyXpGain(withCoins, xp);
+  const next: CityState = { ...withXp, lastPlayedLevelId: levelId };
   storeCityState(next).catch((err: unknown) => {
     console.warn("Aduke's Town: couldn't save city state.", err);
   });
@@ -17,9 +24,9 @@ function awardCoins(levelId: string, amount: number): void {
 // they only share the event bus.
 export function initMatchCoinTie(): void {
   onGameEvent(GameEvents.LevelWin, (payload) => {
-    awardCoins(payload.levelId, computeLevelWinReward(payload.movesRemaining));
+    award(payload.levelId, computeLevelWinReward(payload.movesRemaining), LEVEL_WIN_XP);
   });
   onGameEvent(GameEvents.LevelLose, (payload) => {
-    awardCoins(payload.levelId, LOSS_CONSOLATION_COINS);
+    award(payload.levelId, LOSS_CONSOLATION_COINS, LEVEL_LOSS_XP);
   });
 }

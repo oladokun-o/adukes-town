@@ -1,9 +1,11 @@
 import { getCityState, storeCityState } from "@/game/city/cityState";
 import { levels } from "@/game/levels";
 import { getStoredProgress, storeProgress } from "@/game/levels/progress";
+import { migrateSaveBundle } from "@/save/migrate";
 import {
   isSaveBundle,
   SCHEMA_VERSION,
+  type AnySaveBundle,
   type LevelProgress,
   type SaveBundle,
 } from "@/save/saveBundleSchema";
@@ -36,17 +38,20 @@ export function exportSaveJson(): string {
 // piece's existing write-through path (in-memory cache + idb, plus the city
 // store's change listeners) handles the restore the same way a live change
 // would.
-export async function importSave(bundle: SaveBundle): Promise<void> {
-  if (bundle.schemaVersion !== SCHEMA_VERSION) {
+export async function importSave(bundle: AnySaveBundle): Promise<void> {
+  if (bundle.schemaVersion > SCHEMA_VERSION) {
     throw new Error(`Unsupported save file version: ${bundle.schemaVersion}`);
   }
+  // Older bundles are migrated forward, not rejected — a save from an
+  // earlier version of the app must still restore.
+  const migrated = migrateSaveBundle(bundle);
 
   await Promise.all([
-    ...Object.entries(bundle.progress).map(([levelId, levelProgress]) =>
+    ...Object.entries(migrated.progress).map(([levelId, levelProgress]) =>
       storeProgress(levelId, levelProgress),
     ),
-    setRelaxModeEnabled(bundle.relaxMode),
-    storeCityState(bundle.city),
+    setRelaxModeEnabled(migrated.relaxMode),
+    storeCityState(migrated.city),
   ]);
 }
 

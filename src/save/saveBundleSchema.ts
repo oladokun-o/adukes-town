@@ -1,12 +1,34 @@
 import type { PieceType } from "@/game/board/types";
 import type { CityState } from "@/game/city/types";
 
-// Bumped only if the shape of SaveBundle changes in a way older exports
-// can't be read as. There's no migration logic yet — this is the hook a
-// future version bump would need, per the project's PWA-hardening docs.
-export const SCHEMA_VERSION = 1;
+// Bumped when the shape of SaveBundle changes in a way an older export
+// can't be read as-is. v1 → v2 added the data-driven economy (inventory
+// map, XP/level, barn cap, multi-order/multi-factory). Migration lives in
+// src/save/migrate.ts; every boundary that accepts a bundle (backup import,
+// cloud pull, api/save) migrates on read rather than rejecting old files.
+export const SCHEMA_VERSION = 2;
 
 export type LevelProgress = Partial<Record<PieceType, number>>;
+
+// --- v1 (frozen — input type for the migrator only) -----------------------
+
+export interface CityStateV1 {
+  coins: number;
+  plots: { id: string; unlocked: boolean; crop: { startedAt: number; readyAt: number } | null }[];
+  cropInventory: number;
+  factory: { batch: { startedAt: number; readyAt: number } | null };
+  goodsInventory: number;
+  lastPlayedLevelId: string | null;
+}
+
+export interface SaveBundleV1 {
+  schemaVersion: 1;
+  progress: Record<string, LevelProgress>;
+  relaxMode: boolean;
+  city: CityStateV1;
+}
+
+// --- v2 (current) --------------------------------------------------------
 
 export interface SaveBundle {
   schemaVersion: number;
@@ -15,16 +37,23 @@ export interface SaveBundle {
   city: CityState;
 }
 
-// Shared by the client (backup.ts, validating an imported file) and the
-// cloud save API function (validating a PUT body) — a save bundle crossing
-// either boundary is untrusted input worth checking, not just assuming.
-export function isSaveBundle(value: unknown): value is SaveBundle {
+export type AnySaveBundle = SaveBundle | SaveBundleV1;
+
+// Structural guard shared by the client (backup.ts, cloudSync.ts) and the
+// cloud API (api/save.ts). Accepts v1 and v2 — a bundle crossing either
+// boundary is untrusted input worth checking, but an older version is
+// migrated, not refused.
+export function isSaveBundle(value: unknown): value is AnySaveBundle {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Partial<SaveBundle>;
   return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Partial<SaveBundle>).schemaVersion === "number" &&
-    typeof (value as Partial<SaveBundle>).progress === "object" &&
-    typeof (value as Partial<SaveBundle>).relaxMode === "boolean" &&
-    typeof (value as Partial<SaveBundle>).city === "object"
+    typeof v.schemaVersion === "number" &&
+    v.schemaVersion >= 1 &&
+    v.schemaVersion <= SCHEMA_VERSION &&
+    typeof v.progress === "object" &&
+    v.progress !== null &&
+    typeof v.relaxMode === "boolean" &&
+    typeof v.city === "object" &&
+    v.city !== null
   );
 }

@@ -17,7 +17,7 @@ describe("exportSave", () => {
 
     const bundle = exportSave();
 
-    expect(bundle.schemaVersion).toBe(1);
+    expect(bundle.schemaVersion).toBe(2);
     expect(bundle.progress[firstLevelId]).toEqual({ Red: 4 });
     expect(bundle.relaxMode).toBe(true);
     expect(bundle.city.coins).toBe(42);
@@ -46,7 +46,7 @@ describe("importSave", () => {
     expect(getCityState().coins).toBe(77);
   });
 
-  it("rejects a mismatched schema version", async () => {
+  it("rejects a save file from a newer, unknown schema version", async () => {
     const bundle = {
       schemaVersion: 999,
       progress: {},
@@ -55,6 +55,25 @@ describe("importSave", () => {
     };
 
     await expect(importSave(bundle)).rejects.toThrow(/version/i);
+  });
+
+  it("migrates a legacy v1 bundle forward instead of rejecting it", async () => {
+    await importSave({
+      schemaVersion: 1,
+      progress: { [firstLevelId]: { Red: 1 } },
+      relaxMode: false,
+      city: {
+        coins: 50,
+        cropInventory: 2,
+        goodsInventory: 1,
+        factory: { batch: null },
+        plots: [{ id: "plot-1", unlocked: true, crop: null }],
+        lastPlayedLevelId: null,
+      },
+    });
+
+    expect(getCityState().coins).toBe(50);
+    expect(getCityState().inventory).toEqual({ crop_wheat: 2, good_bread: 1 });
   });
 });
 

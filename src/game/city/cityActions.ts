@@ -1,20 +1,24 @@
 import {
-  COINS_PER_ORDER,
-  CROP_GROW_MS,
-  CROPS_PER_FACTORY_BATCH,
-  EXPAND_SECOND_PLOT_COST,
-  FACTORY_PRODUCE_MS,
-  GOODS_PER_FACTORY_BATCH,
-  GOODS_PER_ORDER,
-  type CityState,
-  type PlotState,
-} from "@/game/city/types";
+  generateOrder,
+  getCrop,
+  getRecipe,
+  PLOT_COSTS,
+  PLOT_UNLOCK_LEVEL,
+} from "@/game/city/catalog";
+import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
 import { isReady, startTimer } from "@/game/city/timers";
+import type { CityState, OrderState, PlotState } from "@/game/city/types";
+import { applyXpGain } from "@/game/city/xp";
 
 // Every action here is a guarded, pure state transition: an invalid call
-// (locked plot, timer not ready, insufficient resources) returns the state
-// unchanged rather than throwing — a stray click should be a no-op, not a
-// crash, matching the project's "no punishing dead ends" design principle.
+// (locked plot, timer not ready, insufficient resources, barn full, content
+// not yet unlocked) returns the state unchanged *by reference* rather than
+// throwing — a stray click should be a no-op, not a crash. Callers rely on
+// `next === state` to skip a redundant save.
+//
+// XP gains are applied *inside* the action, on the already-updated state, so
+// a harvest/collect/fulfil that triggers a level-up bumps barnCapacity in
+// the same transition.
 
 function withPlot(
   state: CityState,
@@ -27,57 +31,117 @@ function withPlot(
   };
 }
 
-export function plantCrop(state: CityState, plotId: string, now: number): CityState {
+function withFactory(
+  state: CityState,
+  factoryId: string,
+  update: (factory: CityState["factories"][number]) => CityState["factories"][number],
+): CityState {
+  return {
+    ...state,
+    factories: state.factories.map((f) => (f.id === factoryId ? update(f) : f)),
+  };
+}
+
+export function plantCrop(
+  state: CityState,
+  plotId: string,
+  cropId: string,
+  now: number,
+): CityState {
   const plot = state.plots.find((p) => p.id === plotId);
-  if (!plot || !plot.unlocked || plot.crop !== null) return state;
-  return withPlot(state, plotId, (p) => ({ ...p, crop: startTimer(now, CROP_GROW_MS) }));
+  if (!plot || !plot.unlocked || plot.planting !== null) return state;
+  const crop = getCrop(cropId);
+  if (!crop || crop.unlockLevel > state.level) return state;
+  return withPlot(state, plotId, (p) => ({
+    ...p,
+    planting: { cropId, timer: startTimer(now, crop.growMs) },
+  }));
 }
 
 export function harvestPlot(state: CityState, plotId: string, now: number): CityState {
   const plot = state.plots.find((p) => p.id === plotId);
-  if (!plot || !isReady(plot.crop, now)) return state;
-  return {
-    ...withPlot(state, plotId, (p) => ({ ...p, crop: null })),
-    cropInventory: state.cropInventory + 1,
+  if (!plot || plot.planting === null || !isReady(plot.planting.timer, now)) return state;
+  const crop = getCrop(plot.planting.cropId);
+  if (!crop || barnFree(state) < crop.yield) return state;
+  const cleared = withPlot(state, plotId, (p) => ({ ...p, planting: null }));
+  const stored: CityState = {
+    ...cleared,
+    inventory: addItems(cleared.inventory, crop.producesItemId, crop.yield),
   };
+  return applyXpGain(stored, crop.xp);
 }
 
-export function startFactoryBatch(state: CityState, now: number): CityState {
-  if (state.factory.batch !== null || state.cropInventory < CROPS_PER_FACTORY_BATCH) return state;
-  return {
+export function startFactoryBatch(
+  state: CityState,
+  factoryId: string,
+  recipeId: string,
+  now: number,
+): CityState {
+  const factory = state.factories.find((f) => f.id === factoryId);
+  if (!factory || factory.batch !== null) return state;
+  const recipe = getRecipe(recipeId);
+  if (!recipe || recipe.factoryId !== factoryId || recipe.unlockLevel > state.level) return state;
+  if (!hasItems(state.inventory, recipe.inputs)) return state;
+
+  let inventory = state.inventory;
+  for (const [id, qty] of Object.entries(recipe.inputs)) {
+    inventory = removeItems(inventory, id, qty);
+  }
+  return withFactory({ ...state, inventory }, factoryId, (f) => ({
+    ...f,
+    batch: { recipeId, timer: startTimer(now, recipe.produceMs) },
+  }));
+}
+
+export function collectFactoryBatch(state: CityState, factoryId: string, now: number): CityState {
+  const factory = state.factories.find((f) => f.id === factoryId);
+  if (!factory || factory.batch === null || !isReady(factory.batch.timer, now)) return state;
+  const recipe = getRecipe(factory.batch.recipeId);
+  if (!recipe || barnFree(state) < recipe.outputQty) return state;
+  const cleared = withFactory(state, factoryId, (f) => ({ ...f, batch: null }));
+  const stored: CityState = {
+    ...cleared,
+    inventory: addItems(cleared.inventory, recipe.outputItemId, recipe.outputQty),
+  };
+  return applyXpGain(stored, recipe.xp);
+}
+
+function nextOrderFor(state: CityState): OrderState {
+  const seed = state.orders.reduce((max, o) => Math.max(max, o.seed), 0) + 1;
+  return { id: `order-${seed}`, seed, ...generateOrder(seed, state.level) };
+}
+
+export function fulfillOrder(state: CityState, orderId: string): CityState {
+  const order = state.orders.find((o) => o.id === orderId);
+  if (!order || !hasItems(state.inventory, order.requires)) return state;
+
+  let inventory = state.inventory;
+  for (const [id, qty] of Object.entries(order.requires)) {
+    inventory = removeItems(inventory, id, qty);
+  }
+  const replacement = nextOrderFor(state);
+  const stored: CityState = {
     ...state,
-    cropInventory: state.cropInventory - CROPS_PER_FACTORY_BATCH,
-    factory: { batch: startTimer(now, FACTORY_PRODUCE_MS) },
+    inventory,
+    coins: state.coins + order.rewardCoins,
+    orders: [...state.orders.filter((o) => o.id !== orderId), replacement],
   };
+  return applyXpGain(stored, order.rewardXp);
 }
 
-export function collectFactoryBatch(state: CityState, now: number): CityState {
-  if (!isReady(state.factory.batch, now)) return state;
+export function buyPlot(state: CityState, plotId: string): CityState {
+  const plot = state.plots.find((p) => p.id === plotId);
+  if (!plot || plot.unlocked) return state;
+  const cost = PLOT_COSTS[plotId];
+  if (cost === undefined || state.coins < cost) return state;
+  if ((PLOT_UNLOCK_LEVEL[plotId] ?? 1) > state.level) return state;
   return {
-    ...state,
-    factory: { batch: null },
-    goodsInventory: state.goodsInventory + GOODS_PER_FACTORY_BATCH,
-  };
-}
-
-export function fulfillOrder(state: CityState): CityState {
-  if (state.goodsInventory < GOODS_PER_ORDER) return state;
-  return {
-    ...state,
-    goodsInventory: state.goodsInventory - GOODS_PER_ORDER,
-    coins: state.coins + COINS_PER_ORDER,
-  };
-}
-
-export function expandSecondPlot(state: CityState): CityState {
-  const secondPlot = state.plots.find((p) => p.id === "plot-2");
-  if (!secondPlot || secondPlot.unlocked || state.coins < EXPAND_SECOND_PLOT_COST) return state;
-  return {
-    ...withPlot(state, "plot-2", (p) => ({ ...p, unlocked: true })),
-    coins: state.coins - EXPAND_SECOND_PLOT_COST,
+    ...withPlot(state, plotId, (p) => ({ ...p, unlocked: true })),
+    coins: state.coins - cost,
   };
 }
 
 export function depositCoins(state: CityState, amount: number): CityState {
+  if (amount <= 0) return state;
   return { ...state, coins: state.coins + amount };
 }

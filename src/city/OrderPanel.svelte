@@ -1,40 +1,71 @@
 <script lang="ts">
-  import { COINS_PER_ORDER, GOODS_PER_ORDER } from "@/game/city/types";
+  import { getItem } from "@/game/city/catalog";
+  import type { OrderState } from "@/game/city/types";
 
   let {
-    goodsInventory,
+    orders,
+    inventory,
     onFulfill,
   }: {
-    goodsInventory: number;
-    onFulfill: () => void;
+    orders: OrderState[];
+    inventory: Record<string, number>;
+    onFulfill: (orderId: string) => void;
   } = $props();
+
+  function canFulfill(order: OrderState): boolean {
+    return Object.entries(order.requires).every(([id, qty]) => (inventory[id] ?? 0) >= qty);
+  }
 </script>
 
-<div class="order">
-  <h2>Order</h2>
-  <p>Goods in storage: {goodsInventory}</p>
-  <button type="button" disabled={goodsInventory < GOODS_PER_ORDER} onclick={onFulfill}>
-    Turn in {GOODS_PER_ORDER} goods for {COINS_PER_ORDER} coins
-  </button>
+<div class="orders">
+  <h2>Orders</h2>
+  {#each orders as order (order.id)}
+    <div class="order">
+      <ul>
+        {#each Object.entries(order.requires) as [id, qty] (id)}
+          <li>
+            {getItem(id)?.icon ?? ""}
+            {getItem(id)?.name ?? id}
+            <span class="count">{inventory[id] ?? 0}/{qty}</span>
+          </li>
+        {/each}
+      </ul>
+      <button type="button" disabled={!canFulfill(order)} onclick={() => onFulfill(order.id)}>
+        Fill · +{order.rewardCoins} 🪙 · +{order.rewardXp} XP
+      </button>
+    </div>
+  {/each}
 </div>
 
 <style>
-  .order {
+  .orders {
     border-radius: 0.75rem;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     padding: 1rem;
-    text-align: center;
   }
 
   h2 {
     margin: 0 0 0.5rem;
     font-size: 1rem;
+    text-align: center;
   }
 
-  p {
-    margin: 0 0 0.5rem;
+  .order {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.1rem;
     font-size: 0.9rem;
+  }
+
+  .count {
+    color: rgba(245, 245, 247, 0.65);
   }
 
   button {
