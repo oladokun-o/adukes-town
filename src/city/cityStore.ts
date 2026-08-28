@@ -2,6 +2,8 @@ import { derived, writable } from "svelte/store";
 import {
   buyPlot,
   collectFactory,
+  collectPen,
+  feedPen,
   fulfillOrder,
   harvestPlot,
   plantCrop,
@@ -50,6 +52,14 @@ export function queueRecipeAction(factoryId: string, recipeId: string): void {
 
 export function collectFactoryAction(factoryId: string): void {
   dispatch((state, now) => collectFactory(state, factoryId, now));
+}
+
+export function feedPenAction(penId: string): void {
+  dispatch((state, now) => feedPen(state, penId, now));
+}
+
+export function collectPenAction(penId: string): void {
+  dispatch((state, now) => collectPen(state, penId, now));
 }
 
 export function fulfill(orderId: string): void {

@@ -2,11 +2,11 @@ import type { PieceType } from "@/game/board/types";
 import type { CityState } from "@/game/city/types";
 
 // Bumped when the shape of SaveBundle changes in a way an older export
-// can't be read as-is. v1 → v2 added the data-driven economy; v2 → v3 made
-// factories a per-factory production queue. Migration lives in
+// can't be read as-is. v1 → v2: data-driven economy; v2 → v3: per-factory
+// production queue; v3 → v4: animal pens. Migration lives in
 // src/save/migrate.ts; every boundary that accepts a bundle (backup import,
 // cloud pull, api/save) migrates on read rather than rejecting old files.
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export type LevelProgress = Partial<Record<PieceType, number>>;
 

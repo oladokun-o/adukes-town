@@ -8,6 +8,8 @@
     buySeedAction,
     cityState,
     collectFactoryAction,
+    collectPenAction,
+    feedPenAction,
     fulfill,
     harvest,
     plant,
@@ -15,6 +17,7 @@
     sellItemAction,
     xpMeter,
   } from "@/city/cityStore";
+  import AnimalPen from "@/city/AnimalPen.svelte";
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
   import Factory from "@/city/Factory.svelte";
@@ -122,6 +125,15 @@
           inventory={$cityState.inventory}
           onQueue={(recipeId) => queueRecipeAction(fid, recipeId)}
           onCollect={() => collectFactoryAction(fid)}
+        />
+      {:else if activeTile.kind === "animal"}
+        {@const pid = activeTile.id}
+        <AnimalPen
+          penId={pid}
+          runtime={$cityState.animals[pid]}
+          inventory={$cityState.inventory}
+          onFeed={() => feedPenAction(pid)}
+          onCollect={() => collectPenAction(pid)}
         />
       {:else if activeTile.kind === "order"}
         <OrderPanel

@@ -1,5 +1,10 @@
 import { emptyFactory } from "@/game/city/factory";
-import { createDefaultCityState, type CityState, type FactoryRuntime } from "@/game/city/types";
+import {
+  createDefaultCityState,
+  type AnimalPenRuntime,
+  type CityState,
+  type FactoryRuntime,
+} from "@/game/city/types";
 import {
   SCHEMA_VERSION,
   type AnySaveBundle,
@@ -13,8 +18,8 @@ import {
 // in, a normalized current value out.
 //
 // Schema history: v1 = scalar economy; v2 = data-driven catalog + inventory
-// map + XP/level + barn; v3 = per-factory production queue (factories became
-// a { queue, startedAt } map keyed by factoryId).
+// map + XP/level + barn; v3 = per-factory production queue; v4 = animal pens
+// (an `animals` { startedAt } map keyed by penId).
 
 interface CityEnvelope {
   schemaVersion: number;
@@ -65,7 +70,20 @@ function normalizeFactories(raw: unknown): Record<string, FactoryRuntime> {
   return {};
 }
 
-function normalizeCity(raw: Partial<CityState> & { factories?: unknown }): CityState {
+function normalizeAnimals(raw: unknown): Record<string, AnimalPenRuntime> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, AnimalPenRuntime> = {};
+  for (const [id, p] of Object.entries(raw as Record<string, unknown>)) {
+    if (p && typeof p === "object") {
+      out[id] = { startedAt: (p as AnimalPenRuntime).startedAt ?? null };
+    }
+  }
+  return out;
+}
+
+function normalizeCity(
+  raw: Partial<CityState> & { factories?: unknown; animals?: unknown },
+): CityState {
   const base = createDefaultCityState();
   return {
     ...base,
@@ -73,6 +91,7 @@ function normalizeCity(raw: Partial<CityState> & { factories?: unknown }): CityS
     inventory: raw.inventory ?? {},
     plots: raw.plots?.length ? raw.plots : base.plots,
     factories: normalizeFactories(raw.factories),
+    animals: normalizeAnimals(raw.animals),
     orders: raw.orders?.length ? raw.orders : base.orders,
     level: raw.level ?? 1,
     xp: raw.xp ?? 0,

@@ -1,6 +1,7 @@
 import { ITEMS, type ItemId } from "@/game/city/catalog/items";
 import { CROPS } from "@/game/city/catalog/crops";
 import { RECIPES } from "@/game/city/catalog/factories";
+import { ANIMAL_PENS } from "@/game/city/catalog/animals";
 
 // Helicopter-style orders: a small bundle of items wanted in exchange for
 // coins + XP. Generation is a PURE function of (seed, level) so the same
@@ -41,6 +42,9 @@ export function orderableItemsAt(level: number): ItemId[] {
   }
   for (const recipe of Object.values(RECIPES)) {
     if (recipe.unlockLevel <= level) ids.add(recipe.outputItemId);
+  }
+  for (const pen of Object.values(ANIMAL_PENS)) {
+    if (pen.unlockLevel <= level) ids.add(pen.producesItemId);
   }
   return [...ids].sort();
 }

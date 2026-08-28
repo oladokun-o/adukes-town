@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANIMAL_PENS,
   barnCapacityForLevel,
   CROPS,
   FACTORIES,
@@ -39,9 +40,10 @@ describe("catalog integrity", () => {
     }
   });
 
-  it("every recipe input is producible — a crop, or another recipe's output", () => {
+  it("every recipe input is producible — a crop, an animal product, or another recipe's output", () => {
     const producible = new Set<string>();
     for (const crop of Object.values(CROPS)) producible.add(crop.producesItemId);
+    for (const pen of Object.values(ANIMAL_PENS)) producible.add(pen.producesItemId);
     for (const recipe of Object.values(RECIPES)) producible.add(recipe.outputItemId);
     for (const recipe of Object.values(RECIPES)) {
       for (const id of Object.keys(recipe.inputs)) {
@@ -50,14 +52,23 @@ describe("catalog integrity", () => {
     }
   });
 
-  it("every recipe input unlocks no later than the recipe itself", () => {
+  function unlockLevelOf(itemId: string): number {
+    const crop = Object.values(CROPS).find((c) => c.producesItemId === itemId);
+    const pen = Object.values(ANIMAL_PENS).find((p) => p.producesItemId === itemId);
+    const src = Object.values(RECIPES).find((r) => r.outputItemId === itemId);
+    return crop?.unlockLevel ?? pen?.unlockLevel ?? src?.unlockLevel ?? 1;
+  }
+
+  it("every recipe/pen input unlocks no later than the thing that needs it", () => {
     for (const recipe of Object.values(RECIPES)) {
       for (const id of Object.keys(recipe.inputs)) {
-        const crop = Object.values(CROPS).find((c) => c.producesItemId === id);
-        const src = Object.values(RECIPES).find((r) => r.outputItemId === id);
-        const inputUnlock = crop?.unlockLevel ?? src?.unlockLevel ?? 1;
-        expect(inputUnlock, `${recipe.id} input ${id}`).toBeLessThanOrEqual(recipe.unlockLevel);
+        expect(unlockLevelOf(id), `${recipe.id} input ${id}`).toBeLessThanOrEqual(
+          recipe.unlockLevel,
+        );
       }
+    }
+    for (const pen of Object.values(ANIMAL_PENS)) {
+      expect(unlockLevelOf(pen.feedItemId), `${pen.id} feed`).toBeLessThanOrEqual(pen.unlockLevel);
     }
   });
 });

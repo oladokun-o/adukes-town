@@ -7,12 +7,14 @@
 export * from "@/game/city/catalog/items";
 export * from "@/game/city/catalog/crops";
 export * from "@/game/city/catalog/factories";
+export * from "@/game/city/catalog/animals";
 export * from "@/game/city/catalog/orders";
 export * from "@/game/city/catalog/unlocks";
 
 import { ITEMS, type ItemDef, type ItemId } from "@/game/city/catalog/items";
 import { CROPS, type CropDef } from "@/game/city/catalog/crops";
 import { FACTORIES, RECIPES, type FactoryDef, type RecipeDef } from "@/game/city/catalog/factories";
+import { ANIMAL_PENS, type AnimalPenDef } from "@/game/city/catalog/animals";
 import { STARTING_BARN_CAPACITY, UNLOCKS } from "@/game/city/catalog/unlocks";
 
 export function getItem(id: ItemId): ItemDef | undefined {
@@ -45,6 +47,14 @@ export function recipesUnlockedAt(level: number): RecipeDef[] {
 
 export function recipesForFactory(factoryId: string, level: number): RecipeDef[] {
   return recipesUnlockedAt(level).filter((r) => r.factoryId === factoryId);
+}
+
+export function getAnimalPen(id: string): AnimalPenDef | undefined {
+  return ANIMAL_PENS[id];
+}
+
+export function animalPensUnlockedAt(level: number): AnimalPenDef[] {
+  return Object.values(ANIMAL_PENS).filter((p) => p.unlockLevel <= level);
 }
 
 // Highest barnCapacity declared at or below `level`, floored at the

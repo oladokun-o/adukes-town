@@ -64,6 +64,15 @@ const GOODS: GoodSpec[] = [
   { id: "veggie_soup", name: "Veggie Soup", icon: "🍲", price: 150 },
   { id: "chocolate", name: "Chocolate", icon: "🍫", price: 300 },
   { id: "choc_cake", name: "Chocolate Cake", icon: "🎂", price: 520 },
+  // Animal produce (Phase 3) + what factories make from it
+  { id: "egg", name: "Eggs", icon: "🥚", price: 14 },
+  { id: "milk", name: "Milk", icon: "🥛", price: 20 },
+  { id: "wool", name: "Wool", icon: "🧼", price: 30 },
+  { id: "butter", name: "Butter", icon: "🧈", price: 55 },
+  { id: "cheese", name: "Cheese", icon: "🧀", price: 130 },
+  { id: "cookies", name: "Cookies", icon: "🍪", price: 60 },
+  { id: "yarn", name: "Yarn", icon: "🧶", price: 80 },
+  { id: "sweater", name: "Sweater", icon: "🧥", price: 260 },
 ];
 
 function buildItems(): Record<ItemId, ItemDef> {

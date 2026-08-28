@@ -1,11 +1,15 @@
 import {
   generateOrder,
+  getAnimalPen,
   getCrop,
   getRecipe,
+  penFeedCost,
+  penYield,
   PLOT_COSTS,
   PLOT_UNLOCK_LEVEL,
 } from "@/game/city/catalog";
 import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
+import { isPenReady } from "@/game/city/animals";
 import { emptyFactory, QUEUE_CAPACITY, settleFactory } from "@/game/city/factory";
 import { isReady, startTimer } from "@/game/city/timers";
 import type { CityState, FactoryRuntime, OrderState, PlotState } from "@/game/city/types";
@@ -158,6 +162,36 @@ export function fulfillOrder(state: CityState, orderId: string): CityState {
     orders: [...state.orders.filter((o) => o.id !== orderId), replacement],
   };
   return applyXpGain(stored, order.rewardXp);
+}
+
+// Feed a whole animal pen: costs feed per animal, starts one produce cycle.
+export function feedPen(state: CityState, penId: string, now: number): CityState {
+  const pen = getAnimalPen(penId);
+  if (!pen || pen.unlockLevel > state.level) return state;
+  const runtime = state.animals[penId];
+  if (runtime?.startedAt != null) return state; // already fed / cooking
+  const cost = penFeedCost(pen);
+  if (!hasItems(state.inventory, { [pen.feedItemId]: cost })) return state;
+  return {
+    ...state,
+    inventory: removeItems(state.inventory, pen.feedItemId, cost),
+    animals: { ...state.animals, [penId]: { startedAt: now } },
+  };
+}
+
+// Collect a pen's produce once the cycle is done.
+export function collectPen(state: CityState, penId: string, now: number): CityState {
+  const pen = getAnimalPen(penId);
+  const runtime = state.animals[penId];
+  if (!pen || !runtime || !isPenReady(penId, runtime, now)) return state;
+  const yielded = penYield(pen);
+  if (barnFree(state) < yielded) return state;
+  const stored: CityState = {
+    ...state,
+    inventory: addItems(state.inventory, pen.producesItemId, yielded),
+    animals: { ...state.animals, [penId]: { startedAt: null } },
+  };
+  return applyXpGain(stored, pen.xp);
 }
 
 export function buyPlot(state: CityState, plotId: string): CityState {

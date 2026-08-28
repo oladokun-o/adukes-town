@@ -28,6 +28,13 @@ export interface FactoryRuntime {
   startedAt: number | null;
 }
 
+// One feed-and-collect cycle per animal pen (no queue). `startedAt` is when
+// the pen was last fed; null = not fed / already collected. Offline
+// progress falls out of the timestamp. See src/game/city/animals.ts.
+export interface AnimalPenRuntime {
+  startedAt: number | null;
+}
+
 export interface OrderState {
   id: string;
   seed: number;
@@ -46,13 +53,16 @@ export interface CityState {
   // Keyed by factoryId, created lazily on first use. Which factories are
   // *available* is derived from `level` (factoriesUnlockedAt), not stored.
   factories: Record<string, FactoryRuntime>;
+  // Keyed by penId, created lazily on first feed. Available pens derive
+  // from `level` (animalPensUnlockedAt).
+  animals: Record<string, AnimalPenRuntime>;
   orders: OrderState[];
   lastPlayedLevelId: string | null;
 }
 
-// Envelope version for the persisted city blob (see src/save/cityState.ts).
+// Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 3;
+export const CITY_SCHEMA_VERSION = 4;
 
 function firstOrder(): OrderState {
   const seed = 1;
@@ -71,6 +81,7 @@ export function createDefaultCityState(): CityState {
     inventory: { seed_wheat: 8 },
     plots: PLOT_LAYOUT.map((id, index) => ({ id, unlocked: index === 0, planting: null })),
     factories: {},
+    animals: {},
     orders: [firstOrder()],
     lastPlayedLevelId: null,
   };

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { factoriesUnlockedAt } from "@/game/city/catalog";
+import { animalPensUnlockedAt, factoriesUnlockedAt } from "@/game/city/catalog";
 import { getCityState, onCityStateChange } from "@/game/city/cityState";
 import { cropStage } from "@/game/city/timers";
 import type { CityState } from "@/game/city/types";
@@ -84,6 +84,15 @@ function buildingsFor(level: number): BuildingSpec[] {
         emoji: FACTORY_EMOJI[f.id] ?? "🏭",
         label: f.name,
         tint: 0xcdb98f,
+      })),
+    ...animalPensUnlockedAt(level)
+      .sort((a, b) => a.unlockLevel - b.unlockLevel)
+      .map((p) => ({
+        kind: "animal" as const,
+        id: p.id,
+        emoji: p.emoji,
+        label: p.name,
+        tint: 0xc7e4a8,
       })),
     { kind: "order", id: "order", emoji: "📦", label: "Orders", tint: 0xbfe0ff },
     { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },

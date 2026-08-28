@@ -10,12 +10,14 @@ import { createDefaultCityState } from "@/game/city/types";
 import { idbGet, idbSet } from "@/save/db";
 
 describe("getCityState / storeCityState", () => {
-  it("persists to IndexedDB and updates the in-memory cache immediately", async () => {
+  it("caches immediately and persists behind a version envelope", async () => {
     const next = { ...createDefaultCityState(), coins: 77 };
     await storeCityState(next);
 
     expect(getCityState()).toEqual(next);
-    expect(await idbGet("city:state")).toEqual(next);
+    const stored = (await idbGet("city:state")) as { schemaVersion: number; state: unknown };
+    expect(typeof stored.schemaVersion).toBe("number");
+    expect(stored.state).toEqual(next);
   });
 
   it("notifies subscribers registered via onCityStateChange", async () => {
@@ -31,29 +33,35 @@ describe("getCityState / storeCityState", () => {
 });
 
 describe("loadCityStateFromDb", () => {
-  it("hydrates the cache from whatever is persisted in IndexedDB", async () => {
-    // written directly, bypassing storeCityState — simulates a value saved
-    // in a prior session, before the in-memory cache is hydrated.
-    const saved = { ...createDefaultCityState(), coins: 250 };
-    await idbSet("city:state", saved);
-
-    await loadCityStateFromDb();
-    expect(getCityState()).toEqual(saved);
-  });
-
-  it("notifies subscribers so a store created before hydration still picks up the loaded value", async () => {
-    // Mirrors the real bootstrap race: cityStore.ts's writable is created
-    // (from the pre-hydration default) as a side effect of main.ts's static
-    // import graph, before loadCityStateFromDb's awaited idb read resolves.
+  it("round-trips the envelope and notifies a store created before hydration", async () => {
     const saved = { ...createDefaultCityState(), coins: 99 };
-    await idbSet("city:state", saved);
+    await storeCityState(saved);
 
     const listener = vi.fn();
-    const unsubscribe = onCityStateChange(listener);
+    const off = onCityStateChange(listener);
+    await loadCityStateFromDb();
+    off();
+
+    expect(getCityState().coins).toBe(99);
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it("migrates a legacy bare (unversioned) blob on load", async () => {
+    await idbSet("city:state", {
+      coins: 200,
+      cropInventory: 3,
+      goodsInventory: 0,
+      factory: { batch: null },
+      plots: [{ id: "plot-1", unlocked: true, crop: null }],
+      lastPlayedLevelId: null,
+    });
 
     await loadCityStateFromDb();
-    expect(listener).toHaveBeenCalledWith(saved);
 
-    unsubscribe();
+    expect(getCityState().coins).toBe(200);
+    expect(getCityState().inventory).toEqual({ seed_wheat: 8, crop_wheat: 3 });
+    expect(getCityState().level).toBe(1);
+    expect(Array.isArray(getCityState().plots)).toBe(true);
+    expect(getCityState().animals).toEqual({});
   });
 });

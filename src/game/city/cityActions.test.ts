@@ -2,13 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   buyPlot,
   collectFactory,
+  collectPen,
   depositCoins,
+  feedPen,
   fulfillOrder,
   harvestPlot,
   plantCrop,
   queueRecipe,
 } from "@/game/city/cityActions";
-import { CROPS, PLOT_COSTS, RECIPES } from "@/game/city/catalog";
+import {
+  ANIMAL_PENS,
+  CROPS,
+  penFeedCost,
+  penYield,
+  PLOT_COSTS,
+  RECIPES,
+} from "@/game/city/catalog";
 import { QUEUE_CAPACITY } from "@/game/city/factory";
 import { createDefaultCityState, type CityState } from "@/game/city/types";
 
@@ -174,6 +183,39 @@ describe("fulfillOrder", () => {
     expect(next.xp).toBeGreaterThanOrEqual(order.rewardXp);
     expect(next.orders).toHaveLength(1);
     expect(next.orders[0].id).not.toBe(order.id);
+  });
+});
+
+describe("feedPen / collectPen", () => {
+  const COOP = ANIMAL_PENS.chicken_coop;
+  const cost = penFeedCost(COOP);
+
+  function ready(): CityState {
+    return stocked({ good_feed: cost + 3 }, { level: COOP.unlockLevel });
+  }
+
+  it("is a no-op below the pen's unlock level or without feed", () => {
+    expect(feedPen(stocked({ good_feed: 99 }, { level: 1 }), "chicken_coop", 0)).toEqual(
+      stocked({ good_feed: 99 }, { level: 1 }),
+    );
+    const poor = stocked({ good_feed: cost - 1 }, { level: COOP.unlockLevel });
+    expect(feedPen(poor, "chicken_coop", 0)).toBe(poor);
+  });
+
+  it("feeding spends feed and starts the cycle; can't feed twice", () => {
+    const fed = feedPen(ready(), "chicken_coop", 1000);
+    expect(fed.inventory.good_feed).toBe(3);
+    expect(fed.animals.chicken_coop).toEqual({ startedAt: 1000 });
+    expect(feedPen(fed, "chicken_coop", 2000)).toBe(fed);
+  });
+
+  it("collecting before ready is a no-op; after ready banks the yield + XP", () => {
+    const fed = feedPen(ready(), "chicken_coop", 0);
+    expect(collectPen(fed, "chicken_coop", COOP.produceMs - 1)).toBe(fed);
+    const got = collectPen(fed, "chicken_coop", COOP.produceMs);
+    expect(got.inventory[COOP.producesItemId]).toBe(penYield(COOP));
+    expect(got.xp).toBe(COOP.xp);
+    expect(got.animals.chicken_coop).toEqual({ startedAt: null });
   });
 });
 

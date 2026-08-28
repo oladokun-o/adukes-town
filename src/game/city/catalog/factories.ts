@@ -43,6 +43,7 @@ const FACTORY_SPECS: FSpec[] = [
   { id: "tailor", name: "Tailor Shop", unlockLevel: 6 },
   { id: "cannery", name: "Cannery", unlockLevel: 7 },
   { id: "kitchen", name: "Kitchen", unlockLevel: 8 },
+  { id: "dairy", name: "Dairy", unlockLevel: 6 },
   { id: "confectionery", name: "Confectionery", unlockLevel: 9 },
   { id: "chocolate_maker", name: "Chocolate Maker", unlockLevel: 12 },
 ];
@@ -94,6 +95,16 @@ const RECIPE_SPECS: RSpec[] = [
     unlockLevel: 3,
     xp: 11,
   },
+  {
+    id: "cookies",
+    factoryId: "bakery",
+    name: "Cookies",
+    inputs: { good_flour: 1, good_egg: 2 },
+    out: "good_cookies",
+    minutes: 12,
+    unlockLevel: 3,
+    xp: 16,
+  },
   // Feed Mill
   {
     id: "feed",
@@ -137,6 +148,16 @@ const RECIPE_SPECS: RSpec[] = [
     unlockLevel: 5,
     xp: 30,
   },
+  {
+    id: "yarn",
+    factoryId: "textile_mill",
+    name: "Yarn",
+    inputs: { good_wool: 2 },
+    out: "good_yarn",
+    minutes: 15,
+    unlockLevel: 7,
+    xp: 22,
+  },
   // Juice Press
   {
     id: "juice",
@@ -158,6 +179,37 @@ const RECIPE_SPECS: RSpec[] = [
     minutes: 40,
     unlockLevel: 6,
     xp: 55,
+  },
+  {
+    id: "sweater",
+    factoryId: "tailor",
+    name: "Sweater",
+    inputs: { good_yarn: 2 },
+    out: "good_sweater",
+    minutes: 50,
+    unlockLevel: 7,
+    xp: 62,
+  },
+  // Dairy
+  {
+    id: "butter",
+    factoryId: "dairy",
+    name: "Butter",
+    inputs: { good_milk: 3 },
+    out: "good_butter",
+    minutes: 30,
+    unlockLevel: 6,
+    xp: 32,
+  },
+  {
+    id: "cheese",
+    factoryId: "dairy",
+    name: "Cheese",
+    inputs: { good_milk: 4 },
+    out: "good_cheese",
+    minutes: 90,
+    unlockLevel: 6,
+    xp: 70,
   },
   // Cannery
   {
@@ -186,7 +238,7 @@ const RECIPE_SPECS: RSpec[] = [
     id: "cake",
     factoryId: "confectionery",
     name: "Cake",
-    inputs: { good_flour: 2, good_sugar: 1 },
+    inputs: { good_flour: 2, good_sugar: 1, good_egg: 2 },
     out: "good_cake",
     minutes: 20,
     unlockLevel: 9,

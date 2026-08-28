@@ -6,6 +6,7 @@ export interface LevelUnlock {
   crops?: string[];
   factories?: string[];
   recipes?: string[];
+  pens?: string[];
   // Highest plot index considered "available to buy" at this level.
   plotsUnlockedTo?: number;
   // Barn capacity floor at this level (monotonic — see barnCapacityForLevel).
@@ -60,7 +61,13 @@ export const UNLOCKS: Record<number, LevelUnlock> = {
     plotsUnlockedTo: 5,
     barnCapacity: 75,
   },
-  3: { crops: ["carrot"], recipes: ["cornbread"], plotsUnlockedTo: 6, barnCapacity: 100 },
+  3: {
+    crops: ["carrot"],
+    recipes: ["cornbread", "cookies"],
+    pens: ["chicken_coop"],
+    plotsUnlockedTo: 6,
+    barnCapacity: 100,
+  },
   4: {
     crops: ["sugarcane"],
     factories: ["sugar_mill"],
@@ -72,17 +79,24 @@ export const UNLOCKS: Record<number, LevelUnlock> = {
     crops: ["cotton"],
     factories: ["textile_mill"],
     recipes: ["thread", "fabric"],
+    pens: ["cow_pasture"],
     plotsUnlockedTo: 8,
     barnCapacity: 150,
   },
   6: {
     crops: ["strawberry"],
-    factories: ["juice_press", "tailor"],
-    recipes: ["juice", "sunhat"],
+    factories: ["juice_press", "tailor", "dairy"],
+    recipes: ["juice", "sunhat", "butter", "cheese"],
     plotsUnlockedTo: 9,
     barnCapacity: 175,
   },
-  7: { crops: ["tomato"], factories: ["cannery"], recipes: ["tomato_sauce"], barnCapacity: 200 },
+  7: {
+    crops: ["tomato"],
+    factories: ["cannery"],
+    recipes: ["tomato_sauce", "yarn", "sweater"],
+    pens: ["sheep_pen"],
+    barnCapacity: 200,
+  },
   8: {
     crops: ["potato"],
     factories: ["kitchen"],

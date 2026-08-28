@@ -1,5 +1,6 @@
+import { CITY_SCHEMA_VERSION, createDefaultCityState, type CityState } from "@/game/city/types";
 import { idbGet, idbSet } from "@/save/db";
-import { createDefaultCityState, type CityState } from "@/game/city/types";
+import { migrateCityState } from "@/save/migrate";
 
 const IDB_KEY = "city:state";
 
@@ -17,6 +18,14 @@ let cache: CityState = createDefaultCityState();
 type Listener = (state: CityState) => void;
 const listeners = new Set<Listener>();
 
+// Persisted behind a version envelope so schema bumps have a marker to
+// branch on. migrateCityState transparently reads the envelope, the older
+// bare-object forms, and is idempotent.
+interface CityEnvelope {
+  schemaVersion: number;
+  state: CityState;
+}
+
 export function onCityStateChange(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -29,20 +38,20 @@ export function getCityState(): CityState {
 export async function storeCityState(next: CityState): Promise<void> {
   cache = next;
   for (const listener of listeners) listener(next);
-  await idbSet(IDB_KEY, next);
+  const envelope: CityEnvelope = { schemaVersion: CITY_SCHEMA_VERSION, state: next };
+  await idbSet(IDB_KEY, envelope);
 }
 
-// Call once at app bootstrap. Since ES module graphs evaluate all static
-// imports before the importing module's own top-level code runs, the Svelte
-// store (cityStore.ts) is already constructed — from the pre-hydration
-// default state — by the time this resolves, via main.ts's dependency
-// chain (main.ts -> mountCityApp.ts -> CityApp.svelte -> cityStore.ts).
+// Call once at app bootstrap, before anything reads getCityState(). Since ES
+// module graphs evaluate all static imports before the importing module's
+// own top-level code runs, the Svelte store (cityStore.ts) is already
+// constructed — from the pre-hydration default — by the time this resolves.
 // Notifying listeners here, not just updating the cache, is what lets that
 // already-created store pick up the hydrated value.
 export async function loadCityStateFromDb(): Promise<void> {
-  const stored = await idbGet<CityState>(IDB_KEY);
-  if (stored) {
-    cache = stored;
-    for (const listener of listeners) listener(stored);
-  }
+  const stored = await idbGet<unknown>(IDB_KEY);
+  if (stored === undefined) return;
+  const migrated = migrateCityState(stored);
+  cache = migrated;
+  for (const listener of listeners) listener(migrated);
 }

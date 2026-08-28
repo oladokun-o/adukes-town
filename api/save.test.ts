@@ -94,9 +94,9 @@ describe("api/save", () => {
     expect(getRes.json).toHaveBeenCalledWith(bundle);
   });
 
-  it("round-trips a current (v3) bundle", async () => {
+  it("round-trips a current (v4) bundle", async () => {
     const bundle = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       progress: {},
       relaxMode: false,
       city: createDefaultCityState(),
