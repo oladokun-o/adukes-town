@@ -11,6 +11,7 @@ import {
   TRAIN_WAGON_COUNT,
 } from "@/game/city/catalog";
 import type { ItemId } from "@/game/city/catalog";
+import { createDefaultStoryState, type StoryState } from "@/game/story/types";
 
 export interface Timer {
   startedAt: number;
@@ -156,12 +157,16 @@ export interface CityState {
   // Soft currency for pre-game boosters — earned only from match-3 wins
   // and achievement claims, never bought.
   boosterCharges: number;
+  // --- Phase 8: narrative ("Remember" mechanic) ------------------
+  // NPC relationships, festivals celebrated, and the active town setback.
+  // Kept inside CityState so it rides the one versioned save + cloud sync.
+  story: StoryState;
   lastPlayedLevelId: string | null;
 }
 
 // Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 8;
+export const CITY_SCHEMA_VERSION = 9;
 
 function orderFromSeed(seed: number, level = 1): OrderState {
   return { id: `order-${seed}`, seed, ...generateOrder(seed, level) };
@@ -227,6 +232,7 @@ export function createDefaultCityState(): CityState {
     harbor: freshHarbor(),
     lives: { count: STARTING_LIVES, since: 0 },
     boosterCharges: 0,
+    story: createDefaultStoryState(),
     lastPlayedLevelId: null,
   };
 }

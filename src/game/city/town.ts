@@ -6,6 +6,7 @@ import {
 } from "@/game/city/catalog";
 import { zooReputation } from "@/game/city/deepEconomy";
 import type { CityState } from "@/game/city/types";
+import { narrativeReputation } from "@/game/story/types";
 
 // Pure derived views over the town layer (CityState.buildings /
 // townExpansions). Nothing here is persisted — it's all recomputed from the
@@ -44,15 +45,17 @@ export function population(state: CityState): number {
   return populationCap(state);
 }
 
-// Town reputation: every placed community building's and decoration's
-// reputation value, plus what the zoo's habitats contribute.
+// Town reputation: buildings + decorations + zoo habitats + the narrative
+// layer (earned relationship hearts, minus an active-setback penalty).
+// Clamped at zero so a fresh town with an early setback doesn't read
+// negative.
 export function townReputation(state: CityState): number {
   let rep = 0;
   for (const [id, count] of Object.entries(state.buildings)) {
     const def = getBuilding(id);
     if (def?.reputation) rep += def.reputation * count;
   }
-  return rep + zooReputation(state);
+  return Math.max(0, rep + zooReputation(state) + narrativeReputation(state.story));
 }
 
 export function buildingCount(state: CityState, buildingId: string): number {

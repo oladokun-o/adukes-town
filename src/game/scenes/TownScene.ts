@@ -119,6 +119,7 @@ function buildingsFor(state: CityState): BuildingSpec[] {
     { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
     { kind: "build", id: "build", emoji: "🏗️", label: "Build", tint: 0xe8d8c0 },
     { kind: "achievements", id: "achievements", emoji: "🏆", label: "Awards", tint: 0xffe9a8 },
+    { kind: "npc", id: "square", emoji: "🧑‍🤝‍🧑", label: "Square", tint: 0xf2d9c2 },
     ...(level >= MINE_UNLOCK_LEVEL
       ? [{ kind: "mine" as const, id: "mine", emoji: "⛏️", label: "Mine", tint: 0x9c8f83 }]
       : []),

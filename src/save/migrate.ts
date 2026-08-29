@@ -75,6 +75,26 @@ function normalizeFactories(raw: unknown): Record<string, FactoryRuntime> {
   return {};
 }
 
+// Ensures every character slot exists (a new NPC added later is filled in
+// with a fresh relationship on the next load).
+function normalizeStory(raw: unknown, base: CityState["story"]): CityState["story"] {
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Partial<CityState["story"]>;
+  const characters = { ...base.characters };
+  const incoming = (r.characters ?? {}) as Record<string, unknown>;
+  for (const id of Object.keys(characters) as (keyof typeof characters)[]) {
+    const c = incoming[id];
+    if (c && typeof c === "object") {
+      characters[id] = { ...characters[id], ...(c as (typeof characters)[typeof id]) };
+    }
+  }
+  return {
+    characters,
+    activeSetback: r.activeSetback ?? null,
+    setbackSeed: typeof r.setbackSeed === "number" ? r.setbackSeed : 1,
+  };
+}
+
 function normalizeAnimals(raw: unknown): Record<string, AnimalPenRuntime> {
   if (!raw || typeof raw !== "object") return {};
   const out: Record<string, AnimalPenRuntime> = {};
@@ -135,6 +155,7 @@ function normalizeCity(
         ? raw.lives
         : base.lives,
     boosterCharges: raw.boosterCharges ?? 0,
+    story: normalizeStory(raw.story, base.story),
     level,
     xp: raw.xp ?? 0,
     barnCapacity: raw.barnCapacity ?? base.barnCapacity,

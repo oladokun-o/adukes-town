@@ -48,7 +48,8 @@ export type TownTileKind =
   | "mine"
   | "zoo"
   | "harbor"
-  | "achievements";
+  | "achievements"
+  | "npc";
 
 export interface TownTileTappedPayload {
   kind: TownTileKind;

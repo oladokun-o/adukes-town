@@ -6,11 +6,11 @@ import type { CityState } from "@/game/city/types";
 // production queue; v3→v4: animal pens; v4→v5: transport trio (heli board,
 // train, plane) + materials + barn upgrades; v5→v6: town layer (buildings +
 // townExpansions); v6→v7: deep economy (tokens, stats, achievements, daily,
-// balloon, mine, zoo, harbor); v7→v8: match-3 lives + booster charges.
+// balloon, mine, zoo, harbor); v7→v8: match-3 lives + booster charges; v8→v9: narrative (story: NPC relationships, festivals, setback).
 // Migration lives in src/save/migrate.ts; every boundary that accepts a
 // bundle (backup import, cloud pull, api/save) migrates on read rather than
 // rejecting old files.
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export type LevelProgress = Partial<Record<PieceType, number>>;
 

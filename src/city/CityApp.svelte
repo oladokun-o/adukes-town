@@ -35,6 +35,11 @@
     rushPenAction,
     sellItemAction,
     town,
+    story,
+    talkToAction,
+    rememberFactAction,
+    celebrateFestivalAction,
+    repairSetbackAction,
     upgradeBarnAction,
     xpMeter,
   } from "@/city/cityStore";
@@ -55,6 +60,7 @@
   import Train from "@/city/Train.svelte";
   import ZooPanel from "@/city/ZooPanel.svelte";
   import Match3Entry from "@/city/Match3Entry.svelte";
+  import SquarePanel from "@/city/SquarePanel.svelte";
   import { barnUsed } from "@/game/city/barn";
   import {
     PLOT_COSTS,
@@ -185,6 +191,20 @@
         onclick={() => (activeTile = { kind: "achievements", id: "achievements" })}
       >
         🏆 {$deep.claimable} to claim
+      </button>
+    {/if}
+    {#if $story.pendingRemembers > 0}
+      <button
+        type="button"
+        class="chip remember"
+        onclick={() => (activeTile = { kind: "npc", id: "square" })}
+      >
+        💭 {$story.pendingRemembers} to remember
+      </button>
+    {/if}
+    {#if $story.activeSetback}
+      <button type="button" class="chip setback" onclick={repairSetbackAction}>
+        🌧️ {$story.activeSetback.label} — repair
       </button>
     {/if}
   </div>
@@ -333,6 +353,13 @@
         />
       {:else if activeTile.kind === "achievements"}
         <AchievementsPanel state={$cityState} onClaim={claimAchievementAction} />
+      {:else if activeTile.kind === "npc"}
+        <SquarePanel
+          state={$cityState}
+          onTalk={talkToAction}
+          onRemember={rememberFactAction}
+          onCelebrate={celebrateFestivalAction}
+        />
       {/if}
       <button type="button" class="close-btn" onclick={closePanel}>Close</button>
     </div>
@@ -423,6 +450,14 @@
 
   .chip.award {
     background: var(--grass);
+  }
+
+  .chip.remember {
+    background: var(--panel);
+  }
+
+  .chip.setback {
+    background: #d9b8a8;
   }
 
   .chip:active {

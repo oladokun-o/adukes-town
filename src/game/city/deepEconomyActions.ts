@@ -19,6 +19,7 @@ import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
 import { bumpStat } from "@/game/city/cityActions";
 import { addLives } from "@/game/city/lives";
 import { shipBack } from "@/game/city/transport";
+import { maybeTriggerSetback } from "@/game/story/storyActions";
 import type { CityState } from "@/game/city/types";
 import { applyXpGain } from "@/game/city/xp";
 
@@ -181,7 +182,7 @@ export function claimDailyBonus(state: CityState, now: number): CityState {
   if (state.daily.lastClaimedDay === today) return state;
   const streak = state.daily.lastClaimedDay === today - 1 ? state.daily.streak + 1 : 1;
   const reward = dailyReward(streak);
-  return addLives(
+  const rewarded = addLives(
     {
       ...state,
       coins: state.coins + reward.coins,
@@ -192,6 +193,9 @@ export function claimDailyBonus(state: CityState, now: number): CityState {
     reward.lives,
     now,
   );
+  // The daily check-in is also the once-a-day roll for a town setback
+  // (story bible §4) — bounded, deterministic, no background timer.
+  return maybeTriggerSetback(rewarded);
 }
 
 export function popBalloon(state: CityState, now: number): CityState {

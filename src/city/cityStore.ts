@@ -39,6 +39,16 @@ import {
   nextHabitat,
 } from "@/game/city/deepEconomy";
 import { shipRemainingMs } from "@/game/city/transport";
+import {
+  celebrateFestival,
+  celebratableFestivals,
+  pendingRemembers,
+  rememberFact,
+  repairSetback,
+  talkTo,
+  totalHearts,
+  type CharacterId,
+} from "@/game/story";
 import { barnUsed } from "@/game/city/barn";
 import {
   buildingSlots,
@@ -97,6 +107,16 @@ export const deep = derived(cityState, (s) => {
     maxLives: MAX_LIVES,
     msToNextLife: msToNextLife(s, now),
     boosterCharges: s.boosterCharges,
+  };
+});
+
+export const story = derived(cityState, (s) => {
+  const now = Date.now();
+  return {
+    hearts: totalHearts(s),
+    pendingRemembers: pendingRemembers(s),
+    activeSetback: s.story.activeSetback,
+    festivals: celebratableFestivals(s, now),
   };
 });
 
@@ -229,4 +249,22 @@ export function popBalloonAction(): void {
 
 export function armBoostersAction(boosterIds: readonly string[]): void {
   dispatch((state) => armBoosters(state, boosterIds));
+}
+
+// --- Phase 8: narrative ------------------------------------------
+
+export function talkToAction(id: CharacterId): void {
+  dispatch((state) => talkTo(state, id));
+}
+
+export function rememberFactAction(id: CharacterId, factId: string): void {
+  dispatch((state) => rememberFact(state, id, factId));
+}
+
+export function celebrateFestivalAction(festivalId: string): void {
+  dispatch((state, now) => celebrateFestival(state, festivalId, now));
+}
+
+export function repairSetbackAction(): void {
+  dispatch((state) => repairSetback(state));
 }
