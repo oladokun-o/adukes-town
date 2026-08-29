@@ -85,6 +85,33 @@ export function playSpecialTrigger(): void {
   osc.stop(start + duration + 0.02);
 }
 
+// Warm rising arpeggio for the Nxtedge Studio splash — softer and slower
+// than the in-game chimes, with a low pad underneath so it reads as a
+// "studio sting" rather than a UI blip.
+export function playStudioChime(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  // Low sustained pad.
+  scheduleTone(ctx, master, t, 130.81, 1.6, "sine", 0.14); // C3
+  // Rising figure: C4 - G4 - C5 - E5.
+  [261.63, 392.0, 523.25, 659.25].forEach((freq, i) => {
+    scheduleTone(ctx, master, t + 0.12 + i * 0.16, freq, 0.5, "triangle", 0.26);
+  });
+}
+
+// A brighter little flourish for the birthday card entrance.
+export function playBirthdayFlourish(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  [523.25, 587.33, 659.25, 880.0].forEach((freq, i) => {
+    scheduleTone(ctx, master, t + i * 0.11, freq, 0.32, "sine", 0.28);
+  });
+}
+
 const CREATE_CHIME_NOTES = [523.25, 659.25, 783.99]; // C5, E5, G5
 
 export function playSpecialCreate(): void {

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { mountCityApp } from "@/city/mountCityApp";
 import { mountOnboarding } from "@/city/mountOnboarding";
+import { mountSplash } from "@/city/splash/mountSplash";
 import type { ResolvedBoosterModifiers } from "@/game/city/catalog";
 import { loadCityStateFromDb } from "@/game/city/cityState";
 import { initMatchCoinTie } from "@/game/city/matchTie";
@@ -14,6 +15,11 @@ import { pushToCloud } from "@/save/cloudSync";
 import { requestPersistentStorage } from "@/save/persist";
 import { loadInstallBannerDismissedFromDb } from "@/settings/installBanner";
 import { loadRelaxModeFromDb } from "@/settings/relaxMode";
+import {
+  loadSplashStateFromDb,
+  markBirthdayCardShown,
+  shouldShowBirthdayCard,
+} from "@/settings/splash";
 
 // IndexedDB is async, but the very first view boots synchronously off the
 // in-memory caches in progress.ts/relaxMode.ts/cityState.ts — so saved
@@ -31,6 +37,7 @@ try {
     loadCityStateFromDb(),
     loadInstallBannerDismissedFromDb(),
     loadAccountFromDb(),
+    loadSplashStateFromDb(),
   ]);
 } catch (err) {
   console.warn("Aduke's Town: couldn't load saved progress, starting fresh.", err);
@@ -126,15 +133,36 @@ function mountApp(): void {
 
 // Onboarding only shows once — a device with no local account yet. It hands
 // off to the city itself once an account is created or restored.
-if (hasLocalAccount()) {
-  mountApp();
-} else {
-  const unmountOnboarding = mountOnboarding(cityAppEl, {
-    onComplete: () => {
-      unmountOnboarding();
-      mountApp();
-    },
-  });
+function boot(): void {
+  if (hasLocalAccount()) {
+    mountApp();
+  } else {
+    const unmountOnboarding = mountOnboarding(cityAppEl, {
+      onComplete: () => {
+        unmountOnboarding();
+        mountApp();
+      },
+    });
+  }
+  showCity();
 }
 
-showCity();
+// The intro sequence runs first: Nxtedge Studio sting, then — in her
+// birthday season, or the very first launch ever — a short personal card.
+// Tapping skips ahead; it always ends by handing off to boot().
+const splashEl = document.getElementById("splash");
+const showBirthday = shouldShowBirthdayCard(Date.now());
+if (splashEl) {
+  const teardownSplash = mountSplash(splashEl, {
+    showBirthday,
+    onDone: () => {
+      teardownSplash();
+      if (showBirthday) {
+        void markBirthdayCardShown();
+      }
+      boot();
+    },
+  });
+} else {
+  boot();
+}

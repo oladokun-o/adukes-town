@@ -44,6 +44,12 @@ body {
   pointer-events: none;
 }
 
+/* The intro sequence sits above everything while it's mounted; Svelte
+   removes its children on teardown, so :empty hides the bare wrapper. */
+#splash:empty {
+  display: none;
+}
+
 #app {
   position: fixed;
   inset: 0;
