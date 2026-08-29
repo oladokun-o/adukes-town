@@ -3,6 +3,7 @@ import {
   BARN_UPGRADE_STEP,
   expansionCost,
   getBuilding,
+  loadoutCost,
   TOWN_EXPANSION_UNLOCK_LEVEL,
   generateOrder,
   generatePlaneManifest,
@@ -398,6 +399,15 @@ export function buildStructure(state: CityState, buildingId: string): CityState 
     buildings: { ...state.buildings, [buildingId]: count + 1 },
   };
   return applyXpGain(bumpStat(stored, "buildingsBuilt"), def.xp);
+}
+
+// Spend booster charges for a match-3 loadout (called as the run starts).
+// No-op if the loadout can't be afforded — the pre-game UI already gates
+// this, but the guard keeps the action honest.
+export function armBoosters(state: CityState, boosterIds: readonly string[]): CityState {
+  const cost = loadoutCost(boosterIds);
+  if (cost <= 0 || state.boosterCharges < cost) return state;
+  return { ...state, boosterCharges: state.boosterCharges - cost };
 }
 
 // Buy another slab of buildable land. Gated by level; cost climbs per slab.

@@ -17,6 +17,9 @@ import {
   rerollOrder,
   upgradeBarn,
 } from "@/game/city/cityActions";
+import { armBoosters } from "@/game/city/cityActions";
+import { currentLives, msToNextLife } from "@/game/city/lives";
+import { MAX_LIVES } from "@/game/city/catalog";
 import {
   buildHabitat,
   claimAchievement,
@@ -90,6 +93,10 @@ export const deep = derived(cityState, (s) => {
     zooBuilt: s.zoo.length,
     shipDeparted: s.harbor.departedAt !== null,
     shipRemainingMs: shipRemainingMs(s.harbor, now),
+    lives: currentLives(s, now),
+    maxLives: MAX_LIVES,
+    msToNextLife: msToNextLife(s, now),
+    boosterCharges: s.boosterCharges,
   };
 });
 
@@ -218,4 +225,8 @@ export function claimDailyAction(): void {
 
 export function popBalloonAction(): void {
   dispatch((state, now) => popBalloon(state, now));
+}
+
+export function armBoostersAction(boosterIds: readonly string[]): void {
+  dispatch((state) => armBoosters(state, boosterIds));
 }

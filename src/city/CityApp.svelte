@@ -3,6 +3,7 @@
   import BackupPanel from "@/city/BackupPanel.svelte";
   import BarnMeter from "@/city/BarnMeter.svelte";
   import {
+    armBoostersAction,
     barn,
     buildStructureAction,
     buyPlotAction,
@@ -53,12 +54,41 @@
   import Plane from "@/city/Plane.svelte";
   import Train from "@/city/Train.svelte";
   import ZooPanel from "@/city/ZooPanel.svelte";
+  import Match3Entry from "@/city/Match3Entry.svelte";
   import { barnUsed } from "@/game/city/barn";
-  import { PLOT_COSTS, PLOT_UNLOCK_LEVEL } from "@/game/city/catalog";
+  import {
+    PLOT_COSTS,
+    PLOT_UNLOCK_LEVEL,
+    resolveBoosterModifiers,
+    type ResolvedBoosterModifiers,
+  } from "@/game/city/catalog";
   import { GameEvents, offGameEvent, onGameEvent, type TownTileTappedPayload } from "@/game/events";
   import { getNextLevel, levels } from "@/game/levels";
+  import { isRelaxModeEnabled, setRelaxModeEnabled } from "@/settings/relaxMode";
 
-  let { onPlayMatch3 }: { onPlayMatch3: (levelId: string) => void } = $props();
+  let {
+    onPlayMatch3,
+  }: {
+    onPlayMatch3: (levelId: string, modifiers?: ResolvedBoosterModifiers) => void;
+  } = $props();
+
+  let match3Entry: { levelId: string; levelName: string } | null = $state(null);
+  let relax = $state(isRelaxModeEnabled());
+
+  function toggleRelax(on: boolean): void {
+    relax = on;
+    setRelaxModeEnabled(on).catch((err: unknown) => {
+      console.warn("Aduke's Town: couldn't save relax-mode setting.", err);
+    });
+  }
+
+  function startMatch3(boosterIds: string[]): void {
+    if (!match3Entry) return;
+    const { levelId } = match3Entry;
+    if (boosterIds.length > 0) armBoostersAction(boosterIds);
+    match3Entry = null;
+    onPlayMatch3(levelId, resolveBoosterModifiers(boosterIds));
+  }
 
   // The town is drawn by TownScene on the canvas underneath. Tapping a
   // tile emits TownTileTapped; this opens the matching detail panel.
@@ -88,7 +118,8 @@
   function playMatch3(): void {
     const last = $cityState.lastPlayedLevelId;
     const nextLevel = (last ? getNextLevel(last) : null) ?? levels[0];
-    onPlayMatch3(nextLevel.id);
+    relax = isRelaxModeEnabled();
+    match3Entry = { levelId: nextLevel.id, levelName: nextLevel.name };
   }
 
   let activePlot = $derived(
@@ -106,8 +137,14 @@
     <div class="badges">
       <LevelBadge level={$xpMeter.level} current={$xpMeter.current} needed={$xpMeter.needed} />
       <CoinBadge coins={$cityState.coins} />
+      <span class="pill" title="Match-3 lives — regenerate over time, never buyable"
+        >♥ {$deep.lives}/{$deep.maxLives}</span
+      >
       <span class="pill" title="Tokens — earned only, spent on rushing timers"
         >💠 {$deep.tokens}</span
+      >
+      <span class="pill" title="Booster charges — earned from match-3 wins"
+        >⚡ {$deep.boosterCharges}</span
       >
       <button
         type="button"
@@ -157,6 +194,24 @@
     <BackupPanel />
   </details>
 </div>
+
+{#if match3Entry}
+  <div class="overlay" role="presentation" onclick={() => (match3Entry = null)}>
+    <div class="overlay-panel" role="presentation" onclick={(e) => e.stopPropagation()}>
+      <Match3Entry
+        levelName={match3Entry.levelName}
+        lives={$deep.lives}
+        maxLives={$deep.maxLives}
+        msToNextLife={$deep.msToNextLife}
+        boosterCharges={$deep.boosterCharges}
+        {relax}
+        onToggleRelax={toggleRelax}
+        onStart={startMatch3}
+      />
+      <button type="button" class="close-btn" onclick={() => (match3Entry = null)}>Close</button>
+    </div>
+  </div>
+{/if}
 
 {#if activeTile}
   <div class="overlay" role="presentation" onclick={closePanel}>

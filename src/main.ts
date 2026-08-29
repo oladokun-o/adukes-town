@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { mountCityApp } from "@/city/mountCityApp";
 import { mountOnboarding } from "@/city/mountOnboarding";
+import type { ResolvedBoosterModifiers } from "@/game/city/catalog";
 import { loadCityStateFromDb } from "@/game/city/cityState";
 import { initMatchCoinTie } from "@/game/city/matchTie";
 import { getLevelById, levels } from "@/game/levels";
@@ -97,9 +98,9 @@ function showBoard(): void {
   if (game.scene.isActive("TownScene")) game.scene.stop("TownScene");
 }
 
-function launchLevel(levelId: string): void {
+function launchLevel(levelId: string, modifiers?: ResolvedBoosterModifiers): void {
   showBoard();
-  game.scene.start("BoardScene", { level: getLevelById(levelId) });
+  game.scene.start("BoardScene", { level: getLevelById(levelId), modifiers });
 }
 
 new Hud(
@@ -119,7 +120,7 @@ const cityAppEl = requireCityAppEl();
 
 function mountApp(): void {
   mountCityApp(cityAppEl, {
-    onPlayMatch3: (levelId) => launchLevel(levelId),
+    onPlayMatch3: (levelId, modifiers) => launchLevel(levelId, modifiers),
   });
 }
 

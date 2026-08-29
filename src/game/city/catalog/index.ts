@@ -14,6 +14,8 @@ export * from "@/game/city/catalog/mine";
 export * from "@/game/city/catalog/zoo";
 export * from "@/game/city/catalog/harbor";
 export * from "@/game/city/catalog/progression";
+export * from "@/game/city/catalog/lives";
+export * from "@/game/city/catalog/boosters";
 export * from "@/game/city/catalog/orders";
 export * from "@/game/city/catalog/transport";
 export * from "@/game/city/catalog/unlocks";

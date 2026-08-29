@@ -6,6 +6,7 @@ import {
   HELI_BOARD_SIZE,
   PLOT_LAYOUT,
   STARTING_BARN_CAPACITY,
+  STARTING_LIVES,
   STARTING_PICKS,
   TRAIN_WAGON_COUNT,
 } from "@/game/city/catalog";
@@ -98,6 +99,13 @@ export interface MineState {
   picks: number;
 }
 
+// Match-3 lives (Phase 7). `count` is the number in hand as of `since`;
+// regen since then is derived from the timestamp (see lives.ts).
+export interface LivesState {
+  count: number;
+  since: number;
+}
+
 export interface CityState {
   coins: number;
   xp: number;
@@ -143,12 +151,17 @@ export interface CityState {
   // Ids of zoo habitats already built.
   zoo: string[];
   harbor: ShipState;
+  // --- Phase 7: match-3 deepening ---------------------------------
+  lives: LivesState;
+  // Soft currency for pre-game boosters — earned only from match-3 wins
+  // and achievement claims, never bought.
+  boosterCharges: number;
   lastPlayedLevelId: string | null;
 }
 
 // Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 7;
+export const CITY_SCHEMA_VERSION = 8;
 
 function orderFromSeed(seed: number, level = 1): OrderState {
   return { id: `order-${seed}`, seed, ...generateOrder(seed, level) };
@@ -212,6 +225,8 @@ export function createDefaultCityState(): CityState {
     mine: { depth: 0, picks: STARTING_PICKS },
     zoo: [],
     harbor: freshHarbor(),
+    lives: { count: STARTING_LIVES, since: 0 },
+    boosterCharges: 0,
     lastPlayedLevelId: null,
   };
 }

@@ -130,6 +130,11 @@ function normalizeCity(
     mine: raw.mine ?? base.mine,
     zoo: Array.isArray(raw.zoo) ? [...raw.zoo] : [],
     harbor: raw.harbor?.manifest ? raw.harbor : freshHarbor(level),
+    lives:
+      raw.lives && typeof raw.lives.count === "number" && typeof raw.lives.since === "number"
+        ? raw.lives
+        : base.lives,
+    boosterCharges: raw.boosterCharges ?? 0,
     level,
     xp: raw.xp ?? 0,
     barnCapacity: raw.barnCapacity ?? base.barnCapacity,

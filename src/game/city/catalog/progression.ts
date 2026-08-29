@@ -31,12 +31,22 @@ export function dayNumber(now: number): number {
   return Math.floor(now / 86_400_000);
 }
 
-export function dailyReward(streak: number): { coins: number; tokens: number; picks: number } {
+// Each claim also refills 3 match-3 lives (never buyable — this and gift
+// balloons + regen are the only ways lives come back).
+export const DAILY_LIVES = 3;
+
+export function dailyReward(streak: number): {
+  coins: number;
+  tokens: number;
+  picks: number;
+  lives: number;
+} {
   const capped = Math.min(streak, DAILY_STREAK_CAP);
   return {
     coins: DAILY_BASE_COINS + (capped - 1) * DAILY_COINS_PER_STREAK,
     tokens: capped % DAILY_TOKEN_EVERY === 0 ? 1 : 0,
     picks: DAILY_PICKS,
+    lives: DAILY_LIVES,
   };
 }
 
@@ -47,7 +57,7 @@ export function dailyReward(streak: number): { coins: number; tokens: number; pi
 export const BALLOON_INTERVAL_MS = 25 * 60_000;
 
 export interface BalloonReward {
-  kind: "coins" | "token" | "pick" | "seed";
+  kind: "coins" | "token" | "pick" | "seed" | "life";
   amount: number;
   // only set when kind === "seed"
   itemId?: string;
@@ -57,9 +67,10 @@ export interface BalloonReward {
 export function balloonReward(seed: number): BalloonReward {
   // xorshift-ish spread without pulling in mulberry32 here
   const r = ((seed ^ (seed >>> 13)) >>> 0) % 100;
-  if (r < 55) return { kind: "coins", amount: 20 + (r % 5) * 10 };
-  if (r < 80) return { kind: "pick", amount: 1 };
-  if (r < 92) return { kind: "seed", amount: 3, itemId: "seed_wheat" };
+  if (r < 50) return { kind: "coins", amount: 20 + (r % 5) * 10 };
+  if (r < 72) return { kind: "pick", amount: 1 };
+  if (r < 85) return { kind: "life", amount: 1 };
+  if (r < 93) return { kind: "seed", amount: 3, itemId: "seed_wheat" };
   return { kind: "token", amount: 1 };
 }
 

@@ -56,6 +56,19 @@ function key(pos: Position): string {
   return `${pos.row},${pos.col}`;
 }
 
+// Resolved pre-game booster effects, applied at scene init. Deliberately a
+// plain data bag with no city imports — the city side (catalog/boosters.ts)
+// produces this shape and passes it through the scene-launch data, keeping
+// the board unaware of the economy (architecture principle: no direct
+// match-3 ↔ city coupling outside the event bus / matchTie).
+export interface BoardModifiers {
+  extraMoves: number;
+  headStart: number;
+  startRainbow: number;
+}
+
+const NO_MODIFIERS: BoardModifiers = { extraMoves: 0, headStart: 0, startRainbow: 0 };
+
 interface DragState {
   start: Position;
   startX: number;
@@ -79,16 +92,29 @@ export class BoardScene extends Phaser.Scene {
   private goalProgress: Partial<Record<PieceType, number>> = {};
   private levelOver = false;
   private paused = false;
+  private modifiers: BoardModifiers = NO_MODIFIERS;
 
   constructor() {
     super("BoardScene");
   }
 
-  init(data: { level?: LevelDef }): void {
+  init(data: { level?: LevelDef; modifiers?: BoardModifiers }): void {
     this.level = data.level ?? getLevelById("level001");
-    this.effectiveMoveLimit = applyRelaxMode(this.level.moveLimit, isRelaxModeEnabled());
+    this.modifiers = data.modifiers ?? NO_MODIFIERS;
+    this.effectiveMoveLimit =
+      applyRelaxMode(this.level.moveLimit, isRelaxModeEnabled()) + this.modifiers.extraMoves;
     this.movesRemaining = this.effectiveMoveLimit;
-    this.goalProgress = getStoredProgress(this.level.id);
+    this.goalProgress = { ...getStoredProgress(this.level.id) };
+    // Head-start booster: seed goal progress (never above the target).
+    if (this.modifiers.headStart > 0) {
+      for (const type of Object.keys(this.level.goal.targets) as PieceType[]) {
+        const target = this.level.goal.targets[type] ?? 0;
+        this.goalProgress[type] = Math.min(
+          target,
+          (this.goalProgress[type] ?? 0) + this.modifiers.headStart,
+        );
+      }
+    }
     this.levelOver = false;
     this.paused = false;
   }
@@ -107,6 +133,7 @@ export class BoardScene extends Phaser.Scene {
     this.board = new Board(this.level.width, this.level.height, this.level.colorCount);
     this.board.refill();
     reshuffleUntilSolvable(this.board);
+    this.applyStartingSpecials();
 
     this.computeLayout();
     this.renderFullBoard(false);
@@ -130,6 +157,23 @@ export class BoardScene extends Phaser.Scene {
 
   private onPauseToggle(): void {
     this.paused = !this.paused;
+  }
+
+  // Rainbow-start booster: convert a few random interior pieces into
+  // RainbowBalls before the first render. Interior only so a stray edge
+  // match on spawn doesn't immediately consume them.
+  private applyStartingSpecials(): void {
+    const want = this.modifiers.startRainbow;
+    if (want <= 0 || this.level.width < 3 || this.level.height < 3) return;
+    const spots: Position[] = [];
+    for (let row = 1; row < this.level.height - 1; row++) {
+      for (let col = 1; col < this.level.width - 1; col++) spots.push({ row, col });
+    }
+    Phaser.Utils.Array.Shuffle(spots);
+    for (const pos of spots.slice(0, want)) {
+      const piece = this.board.get(pos);
+      this.board.set(pos, { ...piece, special: "RainbowBall" });
+    }
   }
 
   private emitMovesChanged(): void {

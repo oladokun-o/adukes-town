@@ -17,6 +17,7 @@ import {
 } from "@/game/city/catalog";
 import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
 import { bumpStat } from "@/game/city/cityActions";
+import { addLives } from "@/game/city/lives";
 import { shipBack } from "@/game/city/transport";
 import type { CityState } from "@/game/city/types";
 import { applyXpGain } from "@/game/city/xp";
@@ -180,13 +181,17 @@ export function claimDailyBonus(state: CityState, now: number): CityState {
   if (state.daily.lastClaimedDay === today) return state;
   const streak = state.daily.lastClaimedDay === today - 1 ? state.daily.streak + 1 : 1;
   const reward = dailyReward(streak);
-  return {
-    ...state,
-    coins: state.coins + reward.coins,
-    tokens: state.tokens + reward.tokens,
-    mine: { ...state.mine, picks: state.mine.picks + reward.picks },
-    daily: { lastClaimedDay: today, streak },
-  };
+  return addLives(
+    {
+      ...state,
+      coins: state.coins + reward.coins,
+      tokens: state.tokens + reward.tokens,
+      mine: { ...state.mine, picks: state.mine.picks + reward.picks },
+      daily: { lastClaimedDay: today, streak },
+    },
+    reward.lives,
+    now,
+  );
 }
 
 export function popBalloon(state: CityState, now: number): CityState {
@@ -203,6 +208,8 @@ export function popBalloon(state: CityState, now: number): CityState {
       return { ...base, tokens: base.tokens + reward.amount };
     case "pick":
       return { ...base, mine: { ...base.mine, picks: base.mine.picks + reward.amount } };
+    case "life":
+      return addLives(base, reward.amount, now);
     case "seed":
       return reward.itemId && barnFree(base) >= reward.amount
         ? { ...base, inventory: addItems(base.inventory, reward.itemId, reward.amount) }
