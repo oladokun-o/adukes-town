@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   animalPensUnlockedAt,
   factoriesUnlockedAt,
+  getBuilding,
   PLANE_UNLOCK_LEVEL,
   TRAIN_UNLOCK_LEVEL,
 } from "@/game/city/catalog";
@@ -76,9 +77,14 @@ const FACTORY_EMOJI: Record<string, string> = {
   chocolate_maker: "🍫",
 };
 
-// Buildings sit in a 2-wide strip to the right of the farm: factories (in
-// unlock order) first, then the fixed Orders and Market stalls.
-function buildingsFor(level: number): BuildingSpec[] {
+// The town occupies a compact rectangular block to the right of the farm:
+// service buildings (factories in unlock order, pens, the fixed stalls)
+// first, then every structure the player has built. Packed row-major
+// TOWN_BLOCK_WIDTH tiles wide so it stays a town, not a diagonal sprawl.
+const TOWN_BLOCK_WIDTH = 3;
+
+function buildingsFor(state: CityState): BuildingSpec[] {
+  const level = state.level;
   const col0 = FARM_GRID_WIDTH + 1;
   const specs: Omit<BuildingSpec, "pos">[] = [
     ...factoriesUnlockedAt(level)
@@ -108,11 +114,36 @@ function buildingsFor(level: number): BuildingSpec[] {
       ? [{ kind: "plane" as const, id: "plane", emoji: "✈️", label: "Plane", tint: 0xd7e8ff }]
       : []),
     { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
+    { kind: "build", id: "build", emoji: "🏗️", label: "Build", tint: 0xe8d8c0 },
+    ...playerStructures(state),
   ];
   return specs.map((s, i) => ({
     ...s,
-    pos: { col: col0 + (i % 2) * 2, row: Math.floor(i / 2) * 3 },
+    pos: {
+      col: col0 + (i % TOWN_BLOCK_WIDTH),
+      row: Math.floor(i / TOWN_BLOCK_WIDTH),
+    },
   }));
+}
+
+// One billboard per placed building (expanded by count). Tapping any of them
+// opens the Build panel.
+function playerStructures(state: CityState): Omit<BuildingSpec, "pos">[] {
+  const out: Omit<BuildingSpec, "pos">[] = [];
+  for (const [id, count] of Object.entries(state.buildings)) {
+    const def = getBuilding(id);
+    if (!def) continue;
+    for (let i = 0; i < count; i++) {
+      out.push({
+        kind: "build",
+        id: `building:${id}:${i}`,
+        emoji: def.emoji,
+        label: def.name,
+        tint: def.kind === "house" ? 0xf2d6b3 : def.kind === "community" ? 0xcfe0f5 : 0xe6f0cf,
+      });
+    }
+  }
+  return out;
 }
 
 export class TownScene extends Phaser.Scene {
@@ -178,7 +209,7 @@ export class TownScene extends Phaser.Scene {
 
     this.renderFenceLine();
 
-    for (const b of buildingsFor(this.cityState.level)) this.renderBuilding(b);
+    for (const b of buildingsFor(this.cityState)) this.renderBuilding(b);
   }
 
   // The Kenney building sprites in this grab-bag set don't ground-anchor

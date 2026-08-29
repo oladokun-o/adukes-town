@@ -1,6 +1,9 @@
 import {
   barnUpgradeCost,
   BARN_UPGRADE_STEP,
+  expansionCost,
+  getBuilding,
+  TOWN_EXPANSION_UNLOCK_LEVEL,
   generateOrder,
   generatePlaneManifest,
   generateTrainWagon,
@@ -21,6 +24,7 @@ import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
 import { isPenReady } from "@/game/city/animals";
 import { emptyFactory, QUEUE_CAPACITY, settleFactory } from "@/game/city/factory";
 import { planeBack, trainBack } from "@/game/city/transport";
+import { buildingSlotsFree } from "@/game/city/town";
 import { isReady, startTimer } from "@/game/city/timers";
 import type { CityState, FactoryRuntime, Manifest, OrderState, PlotState } from "@/game/city/types";
 import { applyXpGain } from "@/game/city/xp";
@@ -343,4 +347,55 @@ export function buyPlot(state: CityState, plotId: string): CityState {
 export function depositCoins(state: CityState, amount: number): CityState {
   if (amount <= 0) return state;
   return { ...state, coins: state.coins + amount };
+}
+
+// --- Town building (Phase 5) -----------------------------------------
+
+function hasMaterials(state: CityState, need: Record<string, number>): boolean {
+  for (const [id, qty] of Object.entries(need)) {
+    if ((state.materials[id] ?? 0) < qty) return false;
+  }
+  return true;
+}
+
+function payMaterials(
+  materials: Record<string, number>,
+  need: Record<string, number>,
+): Record<string, number> {
+  const out = { ...materials };
+  for (const [id, qty] of Object.entries(need)) out[id] = (out[id] ?? 0) - qty;
+  return out;
+}
+
+// Build one instance of a building. Costs coins + materials, respects the
+// unlock level, the per-building max count, and the town's total slot count
+// (raised by land expansion). Awards its one-time XP.
+export function buildStructure(state: CityState, buildingId: string): CityState {
+  const def = getBuilding(buildingId);
+  if (!def || def.unlockLevel > state.level) return state;
+  const count = state.buildings[buildingId] ?? 0;
+  if (def.maxCount !== undefined && count >= def.maxCount) return state;
+  if (buildingSlotsFree(state) < 1) return state;
+  if (state.coins < def.coins || !hasMaterials(state, def.materials)) return state;
+
+  const stored: CityState = {
+    ...state,
+    coins: state.coins - def.coins,
+    materials: payMaterials(state.materials, def.materials),
+    buildings: { ...state.buildings, [buildingId]: count + 1 },
+  };
+  return applyXpGain(stored, def.xp);
+}
+
+// Buy another slab of buildable land. Gated by level; cost climbs per slab.
+export function expandTown(state: CityState): CityState {
+  if (state.level < TOWN_EXPANSION_UNLOCK_LEVEL) return state;
+  const cost = expansionCost(state.townExpansions);
+  if (state.coins < cost.coins || !hasMaterials(state, cost.materials)) return state;
+  return {
+    ...state,
+    coins: state.coins - cost.coins,
+    materials: payMaterials(state.materials, cost.materials),
+    townExpansions: state.townExpansions + 1,
+  };
 }

@@ -119,6 +119,8 @@ function normalizeCity(
     orders,
     train: raw.train?.wagons?.length ? raw.train : freshTrain(level),
     plane: raw.plane?.manifest ? raw.plane : freshPlane(level),
+    buildings: raw.buildings && typeof raw.buildings === "object" ? { ...raw.buildings } : {},
+    townExpansions: raw.townExpansions ?? 0,
     level,
     xp: raw.xp ?? 0,
     barnCapacity: raw.barnCapacity ?? base.barnCapacity,

@@ -8,6 +8,7 @@ export * from "@/game/city/catalog/items";
 export * from "@/game/city/catalog/crops";
 export * from "@/game/city/catalog/factories";
 export * from "@/game/city/catalog/animals";
+export * from "@/game/city/catalog/buildings";
 export * from "@/game/city/catalog/orders";
 export * from "@/game/city/catalog/transport";
 export * from "@/game/city/catalog/unlocks";

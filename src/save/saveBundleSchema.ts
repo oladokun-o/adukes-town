@@ -7,7 +7,7 @@ import type { CityState } from "@/game/city/types";
 // train, plane) + materials + barn upgrades. Migration lives in
 // src/save/migrate.ts; every boundary that accepts a bundle (backup import,
 // cloud pull, api/save) migrates on read rather than rejecting old files.
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export type LevelProgress = Partial<Record<PieceType, number>>;
 

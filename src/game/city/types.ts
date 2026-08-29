@@ -97,12 +97,19 @@ export interface CityState {
   orders: OrderState[];
   train: TrainState;
   plane: PlaneState;
+  // Town layer (Phase 5). `buildings` is buildingId → count placed; which
+  // buildings are *available* derives from `level`. `townExpansions` is how
+  // many land-expansion slabs have been bought (each adds building slots).
+  // Population / reputation are derived (see src/game/city/town.ts), never
+  // stored.
+  buildings: Record<string, number>;
+  townExpansions: number;
   lastPlayedLevelId: string | null;
 }
 
 // Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 5;
+export const CITY_SCHEMA_VERSION = 6;
 
 function orderFromSeed(seed: number, level = 1): OrderState {
   return { id: `order-${seed}`, seed, ...generateOrder(seed, level) };
@@ -148,6 +155,8 @@ export function createDefaultCityState(): CityState {
     orders: freshHeliBoard(),
     train: freshTrain(),
     plane: freshPlane(),
+    buildings: {},
+    townExpansions: 0,
     lastPlayedLevelId: null,
   };
 }

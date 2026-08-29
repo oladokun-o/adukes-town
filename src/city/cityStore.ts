@@ -1,10 +1,12 @@
 import { derived, writable } from "svelte/store";
 import {
+  buildStructure,
   buyPlot,
   collectFactory,
   collectPen,
   collectPlane,
   collectTrain,
+  expandTown,
   feedPen,
   fulfillOrder,
   harvestPlot,
@@ -16,6 +18,14 @@ import {
   upgradeBarn,
 } from "@/game/city/cityActions";
 import { barnUsed } from "@/game/city/barn";
+import {
+  buildingSlots,
+  buildingSlotsFree,
+  buildingsPlaced,
+  population,
+  populationCap,
+  townReputation,
+} from "@/game/city/town";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
 import { buySeed, sellItem } from "@/game/city/market";
 import type { CityState } from "@/game/city/types";
@@ -34,6 +44,16 @@ export const barn = derived(cityState, (s) => ({
 }));
 
 export const xpMeter = derived(cityState, (s) => ({ level: s.level, ...xpIntoLevel(s.xp) }));
+
+export const town = derived(cityState, (s) => ({
+  population: population(s),
+  populationCap: populationCap(s),
+  reputation: townReputation(s),
+  expansions: s.townExpansions,
+  slots: buildingSlots(s),
+  slotsFree: buildingSlotsFree(s),
+  placed: buildingsPlaced(s),
+}));
 
 function dispatch(action: (state: CityState, now: number) => CityState): void {
   const state = getCityState();
@@ -98,6 +118,14 @@ export function upgradeBarnAction(): void {
 
 export function buyPlotAction(plotId: string): void {
   dispatch((state) => buyPlot(state, plotId));
+}
+
+export function buildStructureAction(buildingId: string): void {
+  dispatch((state) => buildStructure(state, buildingId));
+}
+
+export function expandTownAction(): void {
+  dispatch((state) => expandTown(state));
 }
 
 export function buySeedAction(cropId: string, qty: number): void {

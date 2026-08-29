@@ -4,6 +4,7 @@
   import BarnMeter from "@/city/BarnMeter.svelte";
   import {
     barn,
+    buildStructureAction,
     buyPlotAction,
     buySeedAction,
     cityState,
@@ -11,6 +12,7 @@
     collectPenAction,
     collectPlaneAction,
     collectTrainAction,
+    expandTownAction,
     feedPenAction,
     fulfill,
     harvest,
@@ -20,11 +22,13 @@
     queueRecipeAction,
     rerollOrderAction,
     sellItemAction,
+    town,
     upgradeBarnAction,
     xpMeter,
   } from "@/city/cityStore";
   import AnimalPen from "@/city/AnimalPen.svelte";
   import BarnPanel from "@/city/BarnPanel.svelte";
+  import BuildPanel from "@/city/BuildPanel.svelte";
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
   import Factory from "@/city/Factory.svelte";
@@ -99,7 +103,16 @@
 
   <InstallBanner />
 
-  <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
+  <div class="actions-row">
+    <button type="button" class="play-btn" onclick={playMatch3}>Play Match-3</button>
+    <button
+      type="button"
+      class="build-btn"
+      onclick={() => (activeTile = { kind: "build", id: "build" })}
+    >
+      🏗️ Build · 👥 {$town.population} · ⭐ {$town.reputation}
+    </button>
+  </div>
 
   <details class="backup-disclosure">
     <summary><img src="/icons/gear.png" alt="" /> Backup</summary>
@@ -181,6 +194,16 @@
           materials={$cityState.materials}
           onUpgrade={upgradeBarnAction}
         />
+      {:else if activeTile.kind === "build"}
+        <BuildPanel
+          level={$cityState.level}
+          coins={$cityState.coins}
+          materials={$cityState.materials}
+          buildings={$cityState.buildings}
+          town={$town}
+          onBuild={buildStructureAction}
+          onExpand={expandTownAction}
+        />
       {:else if activeTile.kind === "market"}
         <MarketScreen
           level={$cityState.level}
@@ -238,8 +261,32 @@
     cursor: pointer;
   }
 
+  .actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .build-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 0.7rem 1.1rem;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--panel);
+    cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+  }
+
+  .build-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+  }
+
   .play-btn {
-    align-self: flex-start;
     border: none;
     border-radius: 999px;
     padding: 0.7rem 1.1rem;
