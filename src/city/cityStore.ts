@@ -60,6 +60,9 @@ import {
 } from "@/game/city/town";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
 import { buyPicks, buySeed, sellItem } from "@/game/city/market";
+import { getCrop, getItem } from "@/game/city/catalog";
+import { getProfile } from "@/game/story";
+import { pushToast } from "@/city/toasts";
 import type { CityState } from "@/game/city/types";
 import { xpIntoLevel } from "@/game/city/xp";
 
@@ -68,7 +71,18 @@ import { xpIntoLevel } from "@/game/city/xp";
 // truth: this store just mirrors it, via onCityStateChange, so it also picks
 // up coin/XP deposits from matchTie.ts (which never touches Svelte directly).
 export const cityState = writable<CityState>(getCityState());
-onCityStateChange((next) => cityState.set(next));
+
+// Watch every state change (from here OR matchTie.ts) for the milestones
+// worth celebrating with a toast — level-ups and full relationship hearts —
+// regardless of which action or reward path caused them.
+let lastSeen = getCityState();
+onCityStateChange((next) => {
+  if (next.level > lastSeen.level) {
+    pushToast(`Level ${next.level}!`, "level", "⭐");
+  }
+  lastSeen = next;
+  cityState.set(next);
+});
 
 export const barn = derived(cityState, (s) => ({
   used: barnUsed(s.inventory),
@@ -120,13 +134,24 @@ export const story = derived(cityState, (s) => {
   };
 });
 
-function dispatch(action: (state: CityState, now: number) => CityState): void {
+// Runs a guarded action and persists if it changed anything. `onApplied`
+// (when given) fires with the before/after states so a caller can raise a
+// toast describing what happened — it never runs on a no-op.
+function dispatch(
+  action: (state: CityState, now: number) => CityState,
+  onApplied?: (before: CityState, after: CityState) => void,
+): void {
   const state = getCityState();
   const next = action(state, Date.now());
   if (next === state) return;
+  onApplied?.(state, next);
   storeCityState(next).catch((err: unknown) => {
     console.warn("Aduke's Town: couldn't save city state.", err);
   });
+}
+
+function coinDelta(before: CityState, after: CityState): number {
+  return after.coins - before.coins;
 }
 
 export function plant(plotId: string, cropId: string): void {
@@ -134,7 +159,17 @@ export function plant(plotId: string, cropId: string): void {
 }
 
 export function harvest(plotId: string): void {
-  dispatch((state, now) => harvestPlot(state, plotId, now));
+  dispatch(
+    (state, now) => harvestPlot(state, plotId, now),
+    (before) => {
+      const plot = before.plots.find((p) => p.id === plotId);
+      const crop = plot?.planting ? getCrop(plot.planting.cropId) : undefined;
+      if (crop) {
+        const item = getItem(crop.producesItemId);
+        pushToast(`+${crop.yield} ${item?.name ?? "crop"}`, "reward", item?.icon ?? "🧺");
+      }
+    },
+  );
 }
 
 export function queueRecipeAction(factoryId: string, recipeId: string): void {
@@ -142,7 +177,10 @@ export function queueRecipeAction(factoryId: string, recipeId: string): void {
 }
 
 export function collectFactoryAction(factoryId: string): void {
-  dispatch((state, now) => collectFactory(state, factoryId, now));
+  dispatch(
+    (state, now) => collectFactory(state, factoryId, now),
+    () => pushToast("Goods collected", "reward", "📦"),
+  );
 }
 
 export function feedPenAction(penId: string): void {
@@ -150,11 +188,17 @@ export function feedPenAction(penId: string): void {
 }
 
 export function collectPenAction(penId: string): void {
-  dispatch((state, now) => collectPen(state, penId, now));
+  dispatch(
+    (state, now) => collectPen(state, penId, now),
+    () => pushToast("Animal produce collected", "reward", "🥚"),
+  );
 }
 
 export function fulfill(orderId: string): void {
-  dispatch((state) => fulfillOrder(state, orderId));
+  dispatch(
+    (state) => fulfillOrder(state, orderId),
+    (before, after) => pushToast(`Order filled · +${coinDelta(before, after)} 🪙`, "reward", "🚁"),
+  );
 }
 
 export function rerollOrderAction(orderId: string): void {
@@ -166,7 +210,10 @@ export function loadWagonAction(index: number): void {
 }
 
 export function collectTrainAction(): void {
-  dispatch((state, now) => collectTrain(state, now));
+  dispatch(
+    (state, now) => collectTrain(state, now),
+    () => pushToast("The train is back with materials", "reward", "🚂"),
+  );
 }
 
 export function loadPlaneAction(): void {
@@ -174,7 +221,10 @@ export function loadPlaneAction(): void {
 }
 
 export function collectPlaneAction(): void {
-  dispatch((state, now) => collectPlane(state, now));
+  dispatch(
+    (state, now) => collectPlane(state, now),
+    () => pushToast("The plane has landed", "reward", "✈️"),
+  );
 }
 
 export function upgradeBarnAction(): void {
@@ -186,11 +236,17 @@ export function buyPlotAction(plotId: string): void {
 }
 
 export function buildStructureAction(buildingId: string): void {
-  dispatch((state) => buildStructure(state, buildingId));
+  dispatch(
+    (state) => buildStructure(state, buildingId),
+    () => pushToast("New building raised", "reward", "🏗️"),
+  );
 }
 
 export function expandTownAction(): void {
-  dispatch((state) => expandTown(state));
+  dispatch(
+    (state) => expandTown(state),
+    () => pushToast("Land expanded", "reward", "🧱"),
+  );
 }
 
 export function buySeedAction(cropId: string, qty: number): void {
@@ -216,7 +272,13 @@ export function rushPenAction(penId: string): void {
 }
 
 export function digMineAction(): void {
-  dispatch((state) => digMine(state));
+  dispatch(
+    (state) => digMine(state),
+    (before, after) => {
+      const gotToken = after.tokens > before.tokens;
+      pushToast(gotToken ? "A gem! +1 💠" : "Struck materials", "reward", gotToken ? "💎" : "⛏️");
+    },
+  );
 }
 
 export function buyPicksAction(qty: number): void {
@@ -224,7 +286,10 @@ export function buyPicksAction(qty: number): void {
 }
 
 export function buildHabitatAction(habitatId: string): void {
-  dispatch((state) => buildHabitat(state, habitatId));
+  dispatch(
+    (state) => buildHabitat(state, habitatId),
+    () => pushToast("New zoo habitat opened", "reward", "🦁"),
+  );
 }
 
 export function loadShipAction(): void {
@@ -232,19 +297,36 @@ export function loadShipAction(): void {
 }
 
 export function collectShipAction(): void {
-  dispatch((state, now) => collectShip(state, now));
+  dispatch(
+    (state, now) => collectShip(state, now),
+    () => pushToast("The ship returned from the islands", "reward", "⚓"),
+  );
 }
 
 export function claimAchievementAction(id: string): void {
-  dispatch((state) => claimAchievement(state, id));
+  dispatch(
+    (state) => claimAchievement(state, id),
+    () => pushToast("Achievement claimed", "reward", "🏆"),
+  );
 }
 
 export function claimDailyAction(): void {
-  dispatch((state, now) => claimDailyBonus(state, now));
+  dispatch(
+    (state, now) => claimDailyBonus(state, now),
+    (before, after) => {
+      pushToast(`Daily bonus · +${coinDelta(before, after)} 🪙`, "reward", "🎁");
+      if (after.story.activeSetback && !before.story.activeSetback) {
+        pushToast(after.story.activeSetback.label, "warn", "🌧️");
+      }
+    },
+  );
 }
 
 export function popBalloonAction(): void {
-  dispatch((state, now) => popBalloon(state, now));
+  dispatch(
+    (state, now) => popBalloon(state, now),
+    () => pushToast("Gift balloon popped!", "reward", "🎈"),
+  );
 }
 
 export function armBoostersAction(boosterIds: readonly string[]): void {
@@ -258,13 +340,22 @@ export function talkToAction(id: CharacterId): void {
 }
 
 export function rememberFactAction(id: CharacterId, factId: string): void {
-  dispatch((state) => rememberFact(state, id, factId));
+  dispatch(
+    (state) => rememberFact(state, id, factId),
+    () => pushToast(`${getProfile(id).name} won't forget that`, "story", getProfile(id).emoji),
+  );
 }
 
 export function celebrateFestivalAction(festivalId: string): void {
-  dispatch((state, now) => celebrateFestival(state, festivalId, now));
+  dispatch(
+    (state, now) => celebrateFestival(state, festivalId, now),
+    () => pushToast("Festival celebrated 🎉", "story", "🎊"),
+  );
 }
 
 export function repairSetbackAction(): void {
-  dispatch((state) => repairSetback(state));
+  dispatch(
+    (state) => repairSetback(state),
+    () => pushToast("Repaired — the town bounces back", "story", "🛠️"),
+  );
 }

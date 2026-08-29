@@ -57,8 +57,67 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1rem;
+  /* Landscape: the notch / rounded corners are on the left or right edge,
+     so pad the sides by the safe-area inset. */
+  padding: 0.75rem calc(1rem + env(safe-area-inset-right)) 0.75rem
+    calc(1rem + env(safe-area-inset-left));
   pointer-events: none;
+}
+
+/* Rotate-to-landscape hint — only on touch devices held in portrait. Desktop
+   / large screens are never nagged. Covers the whole viewport and sits above
+   everything. */
+#rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  #rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a2e;
+    color: #f5f5f7;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .rotate-hint-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .rotate-hint-icon {
+    font-size: 3rem;
+    animation: rotate-hint-wobble 2s ease-in-out infinite;
+  }
+
+  .rotate-hint-inner p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+  }
+
+  .rotate-hint-sub {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: rgba(245, 245, 247, 0.6);
+  }
+
+  @keyframes rotate-hint-wobble {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(-90deg);
+    }
+  }
 }
 
 #hud > * {

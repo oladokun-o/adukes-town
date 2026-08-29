@@ -61,6 +61,7 @@
   import ZooPanel from "@/city/ZooPanel.svelte";
   import Match3Entry from "@/city/Match3Entry.svelte";
   import SquarePanel from "@/city/SquarePanel.svelte";
+  import Toasts from "@/city/Toasts.svelte";
   import { barnUsed } from "@/game/city/barn";
   import {
     PLOT_COSTS,
@@ -366,6 +367,8 @@
   </div>
 {/if}
 
+<Toasts />
+
 <style>
   .hud {
     position: fixed;
@@ -373,7 +376,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0.75rem 1rem;
+    /* Respect the landscape safe-area insets (side notch / rounded corners). */
+    padding: calc(0.75rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+      calc(0.75rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
     pointer-events: none;
   }
 
