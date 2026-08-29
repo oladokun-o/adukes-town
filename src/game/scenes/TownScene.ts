@@ -167,6 +167,9 @@ export class TownScene extends Phaser.Scene {
   // list order, not depth order, which would break the stacking below.
   private sprites: Phaser.GameObjects.Image[] = [];
   private labels: Phaser.GameObjects.Text[] = [];
+  // Graphics/shape decor (ground, shadows, sign cards) — redrawn each
+  // render, kept apart from `sprites` so frameCamera() only measures tiles.
+  private decor: Phaser.GameObjects.GameObject[] = [];
 
   private isDragging = false;
   private dragStart = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
@@ -188,7 +191,8 @@ export class TownScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor("#8fd3f4");
+    this.cameras.main.setBackgroundColor("#a9dcf0");
+    this.buildAtmosphere();
 
     this.cityState = getCityState();
     this.renderTown();
@@ -208,13 +212,32 @@ export class TownScene extends Phaser.Scene {
     });
   }
 
+  // A fixed sky gradient + soft sun, pinned to the camera (drawn once).
+  private buildAtmosphere(): void {
+    const cam = this.cameras.main;
+    const w = Math.max(cam.width, 2000);
+    const h = Math.max(cam.height, 1400);
+    const sky = this.add.graphics().setScrollFactor(0).setDepth(-2000);
+    sky.fillGradientStyle(0x9ad3ec, 0x9ad3ec, 0xd8ecdf, 0xd8ecdf, 1);
+    sky.fillRect(-w, -h, w * 3, h * 3);
+    this.add
+      .circle(w * 0.22, h * 0.22, Math.min(w, h) * 0.14, 0xfff4cf, 0.55)
+      .setScrollFactor(0)
+      .setDepth(-1999);
+    // sky + sun persist for the scene's life; scene shutdown cleans them up.
+  }
+
   // Full redraw on every city-state change — the town is small enough that
   // diffing isn't worth the complexity yet.
   private renderTown(): void {
     for (const sprite of this.sprites) sprite.destroy();
     for (const label of this.labels) label.destroy();
+    for (const d of this.decor) d.destroy();
     this.sprites = [];
     this.labels = [];
+    this.decor = [];
+
+    this.renderGround();
 
     for (const plot of this.cityState.plots) {
       const gridPos = plotIdToGrid(plot.id);
@@ -226,6 +249,41 @@ export class TownScene extends Phaser.Scene {
     for (const b of buildingsFor(this.cityState)) this.renderBuilding(b);
   }
 
+  // A soft grass shelf under the whole town so nothing floats on the sky.
+  private renderGround(): void {
+    const pts: { x: number; y: number }[] = [];
+    for (const plot of this.cityState.plots) {
+      const g = plotIdToGrid(plot.id);
+      if (g) pts.push(gridToScreen(g));
+    }
+    for (const b of buildingsFor(this.cityState)) pts.push(gridToScreen(b.pos));
+    if (pts.length === 0) return;
+
+    const minX = Math.min(...pts.map((p) => p.x)) - TILE_WIDTH * 1.1;
+    const maxX = Math.max(...pts.map((p) => p.x)) + TILE_WIDTH * 1.1;
+    const minY = Math.min(...pts.map((p) => p.y)) - TILE_WIDTH * 0.9;
+    const maxY = Math.max(...pts.map((p) => p.y)) + TILE_WIDTH * 0.55;
+
+    const g = this.add.graphics().setDepth(-500);
+    g.fillStyle(0x8bbf63, 1);
+    g.fillRoundedRect(minX, minY, maxX - minX, maxY - minY, TILE_WIDTH * 0.7);
+    g.fillStyle(0x7bb057, 1);
+    g.fillRoundedRect(
+      minX + 14,
+      maxY - TILE_WIDTH * 0.5,
+      maxX - minX - 28,
+      TILE_WIDTH * 0.5,
+      TILE_WIDTH * 0.4,
+    );
+    this.decor.push(g);
+  }
+
+  // A soft elliptical contact shadow at a ground anchor.
+  private addShadow(x: number, y: number, depth: number, w = TILE_WIDTH * 0.62): void {
+    const shadow = this.add.ellipse(x, y - 6, w, w * 0.34, 0x1c2a17, 0.22).setDepth(depth - 0.5);
+    this.decor.push(shadow);
+  }
+
   // The Kenney building sprites in this grab-bag set don't ground-anchor
   // cleanly, so buildings are a tinted tile + an emoji billboard for now —
   // honest placeholder art; a cohesive isometric building set comes with
@@ -233,6 +291,8 @@ export class TownScene extends Phaser.Scene {
   private renderBuilding(b: BuildingSpec): void {
     const screen = gridToScreen(b.pos);
     const depth = screen.y * 10;
+
+    this.addShadow(screen.x, screen.y, depth);
 
     const tile = this.add.image(screen.x, screen.y, TEXTURES.soil);
     tile.setOrigin(0.5, 1).setScale(0.95).setTint(b.tint).setDepth(depth);
@@ -244,13 +304,27 @@ export class TownScene extends Phaser.Scene {
     });
     this.sprites.push(tile);
 
-    const emoji = this.add.text(screen.x, screen.y - 40, b.emoji, { fontSize: "64px" });
+    // A little rounded "sign" so the emoji reads as a building, not a
+    // floating glyph. Post + card.
+    const cardW = 118;
+    const cardH = 96;
+    const cardY = screen.y - 34;
+    const card = this.add.graphics().setDepth(depth + 1);
+    card.fillStyle(0x6b4a33, 1);
+    card.fillRect(screen.x - 4, cardY - 10, 8, 26); // post
+    card.fillStyle(0xfff6e9, 1);
+    card.lineStyle(4, 0x6b4a33, 1);
+    card.fillRoundedRect(screen.x - cardW / 2, cardY - cardH, cardW, cardH, 14);
+    card.strokeRoundedRect(screen.x - cardW / 2, cardY - cardH, cardW, cardH, 14);
+    this.decor.push(card);
+
+    const emoji = this.add.text(screen.x, cardY - 20, b.emoji, { fontSize: "52px" });
     emoji.setOrigin(0.5, 1).setDepth(depth + 2);
     this.labels.push(emoji);
 
-    const label = this.add.text(screen.x, screen.y - 118, b.label, {
+    const label = this.add.text(screen.x, cardY - cardH - 6, b.label, {
       fontFamily: "Fredoka, system-ui, sans-serif",
-      fontSize: "26px",
+      fontSize: "24px",
       color: "#ffffff",
       stroke: "#3a2b22",
       strokeThickness: 5,
@@ -308,6 +382,10 @@ export class TownScene extends Phaser.Scene {
     const screen = gridToScreen(gridPos);
     const baseDepth = screen.y * 10;
 
+    // A crop standing on the tile gets a small contact shadow; bare soil
+    // in the tessellated field does not.
+    if (layers.length > 1) this.addShadow(screen.x, screen.y, baseDepth, TILE_WIDTH * 0.42);
+
     layers.forEach(({ texture, tint, scale }, layerIndex) => {
       const pad = BASELINE_PAD[texture] ?? 0;
       const sprite = this.add.image(screen.x, screen.y + pad, texture);
@@ -337,8 +415,12 @@ export class TownScene extends Phaser.Scene {
     for (const sprite of this.sprites) {
       Phaser.Geom.Rectangle.Union(bounds, sprite.getBounds(), bounds);
     }
+    // Building sign cards + labels rise ~200px above their tile and aren't
+    // in `sprites`; grow the box upward so the top row isn't clipped.
+    bounds.y -= 200;
+    bounds.height += 200;
     const cam = this.cameras.main;
-    const margin = 1.12;
+    const margin = 1.14;
     const fit = Math.min(
       cam.width / (bounds.width * margin),
       cam.height / (bounds.height * margin),
