@@ -2,6 +2,7 @@ import { HELI_BOARD_SIZE } from "@/game/city/catalog";
 import { emptyFactory } from "@/game/city/factory";
 import {
   createDefaultCityState,
+  freshHarbor,
   freshHeliBoard,
   freshPlane,
   freshTrain,
@@ -121,6 +122,14 @@ function normalizeCity(
     plane: raw.plane?.manifest ? raw.plane : freshPlane(level),
     buildings: raw.buildings && typeof raw.buildings === "object" ? { ...raw.buildings } : {},
     townExpansions: raw.townExpansions ?? 0,
+    tokens: raw.tokens ?? 0,
+    stats: raw.stats && typeof raw.stats === "object" ? { ...raw.stats } : {},
+    achievements: Array.isArray(raw.achievements) ? [...raw.achievements] : [],
+    daily: raw.daily ?? base.daily,
+    balloon: raw.balloon ?? base.balloon,
+    mine: raw.mine ?? base.mine,
+    zoo: Array.isArray(raw.zoo) ? [...raw.zoo] : [],
+    harbor: raw.harbor?.manifest ? raw.harbor : freshHarbor(level),
     level,
     xp: raw.xp ?? 0,
     barnCapacity: raw.barnCapacity ?? base.barnCapacity,

@@ -17,7 +17,7 @@ describe("exportSave", () => {
 
     const bundle = exportSave();
 
-    expect(bundle.schemaVersion).toBe(6);
+    expect(bundle.schemaVersion).toBe(7);
     expect(bundle.progress[firstLevelId]).toEqual({ Red: 4 });
     expect(bundle.relaxMode).toBe(true);
     expect(bundle.city.coins).toBe(42);

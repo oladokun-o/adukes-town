@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAnimalPen, getItem, penFeedCost, penYield } from "@/game/city/catalog";
+  import { getAnimalPen, getItem, penFeedCost, penYield, tokensToRush } from "@/game/city/catalog";
   import { emptyPen, isPenReady, penRemainingMs } from "@/game/city/animals";
   import type { AnimalPenRuntime } from "@/game/city/types";
 
@@ -7,14 +7,18 @@
     penId,
     runtime,
     inventory,
+    tokens = 0,
     onFeed,
     onCollect,
+    onRush,
   }: {
     penId: string;
     runtime: AnimalPenRuntime | undefined;
     inventory: Record<string, number>;
+    tokens?: number;
     onFeed: () => void;
     onCollect: () => void;
+    onRush?: () => void;
   } = $props();
 
   let now = $state(Date.now());
@@ -60,6 +64,12 @@
     </button>
   {:else}
     <p class="need">Ready in {fmt(leftMs)}</p>
+    {#if onRush}
+      {@const cost = tokensToRush(leftMs)}
+      <button type="button" class="rush" disabled={tokens < cost} onclick={onRush}>
+        ⏩ Rush · {cost} 💠
+      </button>
+    {/if}
   {/if}
 </div>
 
@@ -109,6 +119,22 @@
 
   .primary.collect {
     background: var(--grass);
+  }
+
+  .rush {
+    border: none;
+    border-radius: 999px;
+    padding: 0.4rem 1rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    color: var(--ink);
+    background: var(--bloom);
+    cursor: pointer;
+  }
+
+  .rush:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .primary:disabled {

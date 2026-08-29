@@ -1,10 +1,12 @@
 import {
   generateOrder,
   generatePlaneManifest,
+  generateShipManifest,
   generateTrainWagon,
   HELI_BOARD_SIZE,
   PLOT_LAYOUT,
   STARTING_BARN_CAPACITY,
+  STARTING_PICKS,
   TRAIN_WAGON_COUNT,
 } from "@/game/city/catalog";
 import type { ItemId } from "@/game/city/catalog";
@@ -73,6 +75,29 @@ export interface PlaneState {
   departedAt: number | null;
 }
 
+// The harbor ship (Phase 6) — same shape as the plane, longer trip.
+export type ShipState = PlaneState;
+
+// Daily bonus: one claim per UTC day, escalating with the streak.
+export interface DailyState {
+  lastClaimedDay: number | null;
+  streak: number;
+}
+
+// Gift balloon: the next one is tappable at `availableAt`; `seed` fixes its
+// reward so a reload can't reroll it.
+export interface BalloonState {
+  availableAt: number;
+  seed: number;
+}
+
+// The mine (Phase 6): how deep it's been dug, and how many picks are in
+// hand (a pick is spent per dig).
+export interface MineState {
+  depth: number;
+  picks: number;
+}
+
 export interface CityState {
   coins: number;
   xp: number;
@@ -104,12 +129,26 @@ export interface CityState {
   // stored.
   buildings: Record<string, number>;
   townExpansions: number;
+  // --- Phase 6: deep economy + meta-progression ---------------------
+  // Earned-only premium currency. Never purchasable — spent only on
+  // rushing timers (see catalog/progression.ts).
+  tokens: number;
+  // Running counters that feed achievements (catalog/achievements.ts).
+  stats: Record<string, number>;
+  // Ids of achievements already claimed.
+  achievements: string[];
+  daily: DailyState;
+  balloon: BalloonState;
+  mine: MineState;
+  // Ids of zoo habitats already built.
+  zoo: string[];
+  harbor: ShipState;
   lastPlayedLevelId: string | null;
 }
 
 // Envelope version for the persisted city blob (see cityState.ts).
 // Distinct from SaveBundle's SCHEMA_VERSION but bumped in lockstep.
-export const CITY_SCHEMA_VERSION = 6;
+export const CITY_SCHEMA_VERSION = 7;
 
 function orderFromSeed(seed: number, level = 1): OrderState {
   return { id: `order-${seed}`, seed, ...generateOrder(seed, level) };
@@ -138,6 +177,14 @@ export function freshPlane(level = 1, seed = 1): PlaneState {
   };
 }
 
+export function freshHarbor(level = 1, seed = 1): ShipState {
+  return {
+    manifest: { seed, ...generateShipManifest(seed, level) },
+    loaded: false,
+    departedAt: null,
+  };
+}
+
 export function createDefaultCityState(): CityState {
   return {
     coins: 0,
@@ -157,6 +204,14 @@ export function createDefaultCityState(): CityState {
     plane: freshPlane(),
     buildings: {},
     townExpansions: 0,
+    tokens: 0,
+    stats: {},
+    achievements: [],
+    daily: { lastClaimedDay: null, streak: 0 },
+    balloon: { availableAt: 0, seed: 1 },
+    mine: { depth: 0, picks: STARTING_PICKS },
+    zoo: [],
+    harbor: freshHarbor(),
     lastPlayedLevelId: null,
   };
 }

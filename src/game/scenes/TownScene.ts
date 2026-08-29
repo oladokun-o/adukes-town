@@ -3,8 +3,11 @@ import {
   animalPensUnlockedAt,
   factoriesUnlockedAt,
   getBuilding,
+  HARBOR_UNLOCK_LEVEL,
+  MINE_UNLOCK_LEVEL,
   PLANE_UNLOCK_LEVEL,
   TRAIN_UNLOCK_LEVEL,
+  ZOO_UNLOCK_LEVEL,
 } from "@/game/city/catalog";
 import { getCityState, onCityStateChange } from "@/game/city/cityState";
 import { cropStage } from "@/game/city/timers";
@@ -115,6 +118,16 @@ function buildingsFor(state: CityState): BuildingSpec[] {
       : []),
     { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
     { kind: "build", id: "build", emoji: "🏗️", label: "Build", tint: 0xe8d8c0 },
+    { kind: "achievements", id: "achievements", emoji: "🏆", label: "Awards", tint: 0xffe9a8 },
+    ...(level >= MINE_UNLOCK_LEVEL
+      ? [{ kind: "mine" as const, id: "mine", emoji: "⛏️", label: "Mine", tint: 0x9c8f83 }]
+      : []),
+    ...(level >= ZOO_UNLOCK_LEVEL
+      ? [{ kind: "zoo" as const, id: "zoo", emoji: "🦁", label: "Zoo", tint: 0xc7e4a8 }]
+      : []),
+    ...(level >= HARBOR_UNLOCK_LEVEL
+      ? [{ kind: "harbor" as const, id: "harbor", emoji: "⚓", label: "Harbor", tint: 0xbfe0ff }]
+      : []),
     ...playerStructures(state),
   ];
   return specs.map((s, i) => ({

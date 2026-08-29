@@ -1,7 +1,7 @@
-import { PLANE_TRIP_MS, TRAIN_TRIP_MS } from "@/game/city/catalog";
-import type { PlaneState, TrainState } from "@/game/city/types";
+import { PLANE_TRIP_MS, SHIP_TRIP_MS, TRAIN_TRIP_MS } from "@/game/city/catalog";
+import type { PlaneState, ShipState, TrainState } from "@/game/city/types";
 
-// Pure trip-status queries for the train and plane.
+// Pure trip-status queries for the train, plane, and harbor ship.
 
 export function trainRemainingMs(train: TrainState, now: number): number {
   return train.departedAt === null ? 0 : Math.max(0, train.departedAt + TRAIN_TRIP_MS - now);
@@ -17,4 +17,12 @@ export function planeRemainingMs(plane: PlaneState, now: number): number {
 
 export function planeBack(plane: PlaneState, now: number): boolean {
   return plane.departedAt !== null && now - plane.departedAt >= PLANE_TRIP_MS;
+}
+
+export function shipRemainingMs(ship: ShipState, now: number): number {
+  return ship.departedAt === null ? 0 : Math.max(0, ship.departedAt + SHIP_TRIP_MS - now);
+}
+
+export function shipBack(ship: ShipState, now: number): boolean {
+  return ship.departedAt !== null && now - ship.departedAt >= SHIP_TRIP_MS;
 }

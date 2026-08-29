@@ -11,33 +11,48 @@
     collectFactoryAction,
     collectPenAction,
     collectPlaneAction,
+    collectShipAction,
     collectTrainAction,
+    buildHabitatAction,
+    buyPicksAction,
+    claimAchievementAction,
+    claimDailyAction,
+    deep,
+    digMineAction,
     expandTownAction,
     feedPenAction,
     fulfill,
     harvest,
     loadPlaneAction,
+    loadShipAction,
     loadWagonAction,
     plant,
+    popBalloonAction,
     queueRecipeAction,
     rerollOrderAction,
+    rushFactoryAction,
+    rushPenAction,
     sellItemAction,
     town,
     upgradeBarnAction,
     xpMeter,
   } from "@/city/cityStore";
+  import AchievementsPanel from "@/city/AchievementsPanel.svelte";
   import AnimalPen from "@/city/AnimalPen.svelte";
   import BarnPanel from "@/city/BarnPanel.svelte";
   import BuildPanel from "@/city/BuildPanel.svelte";
   import CoinBadge from "@/city/CoinBadge.svelte";
   import CropPlot from "@/city/CropPlot.svelte";
   import Factory from "@/city/Factory.svelte";
+  import HarborPanel from "@/city/HarborPanel.svelte";
   import InstallBanner from "@/city/InstallBanner.svelte";
   import LevelBadge from "@/city/LevelBadge.svelte";
   import MarketScreen from "@/city/MarketScreen.svelte";
+  import MinePanel from "@/city/MinePanel.svelte";
   import OrderPanel from "@/city/OrderPanel.svelte";
   import Plane from "@/city/Plane.svelte";
   import Train from "@/city/Train.svelte";
+  import ZooPanel from "@/city/ZooPanel.svelte";
   import { barnUsed } from "@/game/city/barn";
   import { PLOT_COSTS, PLOT_UNLOCK_LEVEL } from "@/game/city/catalog";
   import { GameEvents, offGameEvent, onGameEvent, type TownTileTappedPayload } from "@/game/events";
@@ -91,6 +106,9 @@
     <div class="badges">
       <LevelBadge level={$xpMeter.level} current={$xpMeter.current} needed={$xpMeter.needed} />
       <CoinBadge coins={$cityState.coins} />
+      <span class="pill" title="Tokens — earned only, spent on rushing timers"
+        >💠 {$deep.tokens}</span
+      >
       <button
         type="button"
         class="badge-btn"
@@ -112,6 +130,26 @@
     >
       🏗️ Build · 👥 {$town.population} · ⭐ {$town.reputation}
     </button>
+  </div>
+
+  <div class="actions-row">
+    {#if $deep.dailyAvailable}
+      <button type="button" class="chip daily" onclick={claimDailyAction}>
+        🎁 Daily bonus{$deep.dailyStreak > 0 ? ` (day ${$deep.dailyStreak + 1})` : ""}
+      </button>
+    {/if}
+    {#if $deep.balloonReady}
+      <button type="button" class="chip balloon" onclick={popBalloonAction}>🎈 Gift!</button>
+    {/if}
+    {#if $deep.claimable > 0}
+      <button
+        type="button"
+        class="chip award"
+        onclick={() => (activeTile = { kind: "achievements", id: "achievements" })}
+      >
+        🏆 {$deep.claimable} to claim
+      </button>
+    {/if}
   </div>
 
   <details class="backup-disclosure">
@@ -152,8 +190,10 @@
           runtime={$cityState.factories[fid]}
           level={$cityState.level}
           inventory={$cityState.inventory}
+          tokens={$deep.tokens}
           onQueue={(recipeId) => queueRecipeAction(fid, recipeId)}
           onCollect={() => collectFactoryAction(fid)}
+          onRush={() => rushFactoryAction(fid)}
         />
       {:else if activeTile.kind === "animal"}
         {@const pid = activeTile.id}
@@ -161,8 +201,10 @@
           penId={pid}
           runtime={$cityState.animals[pid]}
           inventory={$cityState.inventory}
+          tokens={$deep.tokens}
           onFeed={() => feedPenAction(pid)}
           onCollect={() => collectPenAction(pid)}
+          onRush={() => rushPenAction(pid)}
         />
       {:else if activeTile.kind === "order"}
         <OrderPanel
@@ -213,6 +255,29 @@
           onBuySeed={buySeedAction}
           onSell={sellItemAction}
         />
+      {:else if activeTile.kind === "mine"}
+        <MinePanel
+          depth={$cityState.mine.depth}
+          picks={$cityState.mine.picks}
+          coins={$cityState.coins}
+          onDig={digMineAction}
+          onBuyPicks={buyPicksAction}
+        />
+      {:else if activeTile.kind === "zoo"}
+        <ZooPanel
+          zoo={$cityState.zoo}
+          inventory={$cityState.inventory}
+          onBuild={buildHabitatAction}
+        />
+      {:else if activeTile.kind === "harbor"}
+        <HarborPanel
+          harbor={$cityState.harbor}
+          inventory={$cityState.inventory}
+          onLoad={loadShipAction}
+          onCollect={collectShipAction}
+        />
+      {:else if activeTile.kind === "achievements"}
+        <AchievementsPanel state={$cityState} onClaim={claimAchievementAction} />
       {/if}
       <button type="button" class="close-btn" onclick={closePanel}>Close</button>
     </div>
@@ -266,6 +331,48 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+  }
+
+  .chip {
+    border: none;
+    border-radius: 999px;
+    padding: 0.5rem 0.9rem;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+  }
+
+  .chip.daily {
+    background: var(--sun);
+  }
+
+  .chip.balloon {
+    background: var(--bloom);
+  }
+
+  .chip.award {
+    background: var(--grass);
+  }
+
+  .chip:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
   }
 
   .build-btn {

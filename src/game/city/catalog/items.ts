@@ -15,6 +15,11 @@ export const MATERIALS: { id: string; name: string; icon: string }[] = [
   { id: "glue", name: "Glue", icon: "🧴" },
   { id: "paint", name: "Paint", icon: "🎨" },
   { id: "brick", name: "Brick", icon: "🧱" },
+  // Mine hauls (Phase 6)
+  { id: "stone", name: "Stone", icon: "🪨" },
+  { id: "ore", name: "Iron Ore", icon: "🟤" },
+  { id: "coal", name: "Coal", icon: "⚫" },
+  { id: "gem", name: "Gem", icon: "💎" },
 ];
 
 export interface ItemDef {

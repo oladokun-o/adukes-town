@@ -72,7 +72,7 @@ describe("migrateSaveBundle", () => {
       city: v1City,
     };
     const next = migrateSaveBundle(bundle);
-    expect(next.schemaVersion).toBe(6);
+    expect(next.schemaVersion).toBe(7);
     expect(next.progress).toEqual({ level001: { Red: 3 } });
     expect(next.relaxMode).toBe(true);
     expect(next.city.inventory).toEqual({ seed_wheat: 8, crop_wheat: 4, good_bread: 2 });

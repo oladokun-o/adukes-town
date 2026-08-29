@@ -17,6 +17,25 @@ import {
   rerollOrder,
   upgradeBarn,
 } from "@/game/city/cityActions";
+import {
+  buildHabitat,
+  claimAchievement,
+  claimDailyBonus,
+  collectShip,
+  digMine,
+  loadShip,
+  popBalloon,
+  rushCrop,
+  rushFactory,
+  rushPen,
+} from "@/game/city/deepEconomyActions";
+import {
+  balloonReady,
+  claimableAchievements,
+  dailyAvailable,
+  nextHabitat,
+} from "@/game/city/deepEconomy";
+import { shipRemainingMs } from "@/game/city/transport";
 import { barnUsed } from "@/game/city/barn";
 import {
   buildingSlots,
@@ -27,7 +46,7 @@ import {
   townReputation,
 } from "@/game/city/town";
 import { getCityState, onCityStateChange, storeCityState } from "@/game/city/cityState";
-import { buySeed, sellItem } from "@/game/city/market";
+import { buyPicks, buySeed, sellItem } from "@/game/city/market";
 import type { CityState } from "@/game/city/types";
 import { xpIntoLevel } from "@/game/city/xp";
 
@@ -54,6 +73,25 @@ export const town = derived(cityState, (s) => ({
   slotsFree: buildingSlotsFree(s),
   placed: buildingsPlaced(s),
 }));
+
+// Phase 6 meta layer. `now` is read once per tick by callers that need it;
+// these are cheap re-derivations on every state change.
+export const deep = derived(cityState, (s) => {
+  const now = Date.now();
+  return {
+    tokens: s.tokens,
+    picks: s.mine.picks,
+    mineDepth: s.mine.depth,
+    claimable: claimableAchievements(s).length,
+    dailyAvailable: dailyAvailable(s, now),
+    dailyStreak: s.daily.streak,
+    balloonReady: balloonReady(s, now),
+    nextHabitat: nextHabitat(s),
+    zooBuilt: s.zoo.length,
+    shipDeparted: s.harbor.departedAt !== null,
+    shipRemainingMs: shipRemainingMs(s.harbor, now),
+  };
+});
 
 function dispatch(action: (state: CityState, now: number) => CityState): void {
   const state = getCityState();
@@ -134,4 +172,50 @@ export function buySeedAction(cropId: string, qty: number): void {
 
 export function sellItemAction(itemId: string, qty: number): void {
   dispatch((state) => sellItem(state, itemId, qty));
+}
+
+// --- Phase 6 -------------------------------------------------------
+
+export function rushCropAction(plotId: string): void {
+  dispatch((state, now) => rushCrop(state, plotId, now));
+}
+
+export function rushFactoryAction(factoryId: string): void {
+  dispatch((state, now) => rushFactory(state, factoryId, now));
+}
+
+export function rushPenAction(penId: string): void {
+  dispatch((state, now) => rushPen(state, penId, now));
+}
+
+export function digMineAction(): void {
+  dispatch((state) => digMine(state));
+}
+
+export function buyPicksAction(qty: number): void {
+  dispatch((state) => buyPicks(state, qty));
+}
+
+export function buildHabitatAction(habitatId: string): void {
+  dispatch((state) => buildHabitat(state, habitatId));
+}
+
+export function loadShipAction(): void {
+  dispatch((state, now) => loadShip(state, now));
+}
+
+export function collectShipAction(): void {
+  dispatch((state, now) => collectShip(state, now));
+}
+
+export function claimAchievementAction(id: string): void {
+  dispatch((state) => claimAchievement(state, id));
+}
+
+export function claimDailyAction(): void {
+  dispatch((state, now) => claimDailyBonus(state, now));
+}
+
+export function popBalloonAction(): void {
+  dispatch((state, now) => popBalloon(state, now));
 }

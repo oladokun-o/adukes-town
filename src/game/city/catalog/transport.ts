@@ -27,7 +27,11 @@ export interface TransportReward {
   xp: number;
 }
 
-const MATERIAL_IDS = MATERIALS.map((m) => `mat_${m.id}`);
+// The train/plane deliver construction materials; the mine drops the raw
+// stone/ore/coal/gem set (see catalog/mine.ts), so keep the reward pool to
+// the buildable materials only.
+const MINE_ONLY = new Set(["mat_stone", "mat_ore", "mat_coal", "mat_gem"]);
+const MATERIAL_IDS = MATERIALS.map((m) => `mat_${m.id}`).filter((id) => !MINE_ONLY.has(id));
 
 function rewardMaterials(
   rand: () => number,

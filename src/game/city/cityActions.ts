@@ -39,6 +39,13 @@ import { applyXpGain } from "@/game/city/xp";
 // a harvest/collect/fulfil that triggers a level-up bumps barnCapacity in
 // the same transition.
 
+// Bump a running achievement counter. `by === 0` is a no-op passthrough so
+// callers can bump unconditionally.
+export function bumpStat(state: CityState, key: string, by = 1): CityState {
+  if (by === 0) return state;
+  return { ...state, stats: { ...state.stats, [key]: (state.stats[key] ?? 0) + by } };
+}
+
 function withPlot(
   state: CityState,
   plotId: string,
@@ -91,7 +98,7 @@ export function harvestPlot(state: CityState, plotId: string, now: number): City
     ...cleared,
     inventory: addItems(cleared.inventory, crop.producesItemId, crop.yield),
   };
-  return applyXpGain(stored, crop.xp);
+  return applyXpGain(bumpStat(stored, "cropsHarvested"), crop.xp);
 }
 
 // Queue a recipe. Inputs are consumed immediately (Township-style); the
@@ -152,7 +159,7 @@ export function collectFactory(state: CityState, factoryId: string, now: number)
       [factoryId]: { queue: remaining, startedAt: remainingStartedAt },
     },
   };
-  return applyXpGain(stored, xp);
+  return applyXpGain(bumpStat(stored, "goodsProduced", totalOut), xp);
 }
 
 // One monotonic seed pool across every generated bundle (heli / train /
@@ -195,7 +202,7 @@ export function fulfillOrder(state: CityState, orderId: string): CityState {
       newOrder(nextSeed(state), state.level),
     ],
   };
-  return applyXpGain(stored, order.rewardXp);
+  return applyXpGain(bumpStat(stored, "ordersFilled"), order.rewardXp);
 }
 
 // Discard an order for a fresh one (free — no pure-loss friction).
@@ -249,7 +256,10 @@ export function collectTrain(state: CityState, now: number): CityState {
     seed: base + i,
     ...generateTrainWagon(base + i, state.level),
   }));
-  return grantReward({ ...state, train: { wagons, filled: [], departedAt: null } }, reward);
+  return grantReward(
+    bumpStat({ ...state, train: { wagons, filled: [], departedAt: null } }, "tripsCompleted"),
+    reward,
+  );
 }
 
 // --- Plane -------------------------------------------------------------
@@ -271,14 +281,17 @@ export function collectPlane(state: CityState, now: number): CityState {
   const reward = planeReward(state.plane.manifest.seed, state.level);
   const seed = nextSeed(state);
   return grantReward(
-    {
-      ...state,
-      plane: {
-        manifest: { seed, ...generatePlaneManifest(seed, state.level) },
-        loaded: false,
-        departedAt: null,
+    bumpStat(
+      {
+        ...state,
+        plane: {
+          manifest: { seed, ...generatePlaneManifest(seed, state.level) },
+          loaded: false,
+          departedAt: null,
+        },
       },
-    },
+      "tripsCompleted",
+    ),
     reward,
   );
 }
@@ -329,7 +342,7 @@ export function collectPen(state: CityState, penId: string, now: number): CitySt
     inventory: addItems(state.inventory, pen.producesItemId, yielded),
     animals: { ...state.animals, [penId]: { startedAt: null } },
   };
-  return applyXpGain(stored, pen.xp);
+  return applyXpGain(bumpStat(stored, "animalsCollected"), pen.xp);
 }
 
 export function buyPlot(state: CityState, plotId: string): CityState {
@@ -351,14 +364,14 @@ export function depositCoins(state: CityState, amount: number): CityState {
 
 // --- Town building (Phase 5) -----------------------------------------
 
-function hasMaterials(state: CityState, need: Record<string, number>): boolean {
+export function hasMaterials(state: CityState, need: Record<string, number>): boolean {
   for (const [id, qty] of Object.entries(need)) {
     if ((state.materials[id] ?? 0) < qty) return false;
   }
   return true;
 }
 
-function payMaterials(
+export function payMaterials(
   materials: Record<string, number>,
   need: Record<string, number>,
 ): Record<string, number> {
@@ -384,7 +397,7 @@ export function buildStructure(state: CityState, buildingId: string): CityState 
     materials: payMaterials(state.materials, def.materials),
     buildings: { ...state.buildings, [buildingId]: count + 1 },
   };
-  return applyXpGain(stored, def.xp);
+  return applyXpGain(bumpStat(stored, "buildingsBuilt"), def.xp);
 }
 
 // Buy another slab of buildable land. Gated by level; cost climbs per slab.

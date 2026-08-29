@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { getFactory, getItem, getRecipe, recipesForFactory } from "@/game/city/catalog";
+  import {
+    getFactory,
+    getItem,
+    getRecipe,
+    recipesForFactory,
+    tokensToRush,
+  } from "@/game/city/catalog";
   import {
     activeRemainingMs,
     emptyFactory,
@@ -15,15 +21,19 @@
     runtime,
     level,
     inventory,
+    tokens = 0,
     onQueue,
     onCollect,
+    onRush,
   }: {
     factoryId: string;
     runtime: FactoryRuntime | undefined;
     level: number;
     inventory: Record<string, number>;
+    tokens?: number;
     onQueue: (recipeId: string) => void;
     onCollect: () => void;
+    onRush?: () => void;
   } = $props();
 
   let now = $state(Date.now());
@@ -40,6 +50,11 @@
   let ready = $derived(readyCount(f, now));
   let settled = $derived(settleFactory(f, now));
   let activeLeftMs = $derived(activeRemainingMs(f, now));
+  // Time until the whole queue is finished (active slot + everything behind it).
+  let queueLeftMs = $derived(
+    activeLeftMs +
+      settled.remaining.slice(1).reduce((sum, rid) => sum + (getRecipe(rid)?.produceMs ?? 0), 0),
+  );
 
   function fmt(ms: number): string {
     const s = Math.ceil(ms / 1000);
@@ -76,6 +91,13 @@
 
   {#if ready > 0}
     <button type="button" class="collect" onclick={onCollect}>Collect {ready}</button>
+  {/if}
+
+  {#if onRush && settled.remaining.length > 0}
+    {@const cost = tokensToRush(queueLeftMs)}
+    <button type="button" class="rush" disabled={tokens < cost} onclick={onRush}>
+      ⏩ Finish now · {cost} 💠
+    </button>
   {/if}
 
   <ul class="recipes">
@@ -167,6 +189,11 @@
     color: var(--ink);
     background: var(--grass);
     cursor: pointer;
+  }
+
+  .rush {
+    align-self: center;
+    background: var(--bloom);
   }
 
   .recipes {

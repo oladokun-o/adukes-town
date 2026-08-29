@@ -1,4 +1,4 @@
-import { getCrop, getItem } from "@/game/city/catalog";
+import { getCrop, getItem, PICK_PRICE } from "@/game/city/catalog";
 import { addItems, barnFree, hasItems, removeItems } from "@/game/city/barn";
 import type { CityState } from "@/game/city/types";
 
@@ -27,6 +27,18 @@ export function buySeed(state: CityState, cropId: string, qty: number): CityStat
     ...state,
     coins: state.coins - cost,
     inventory: addItems(state.inventory, crop.seedItemId, qty),
+  };
+}
+
+// Mine picks are also sold here — coins in, picks in hand.
+export function buyPicks(state: CityState, qty: number): CityState {
+  if (qty <= 0) return state;
+  const cost = PICK_PRICE * qty;
+  if (state.coins < cost) return state;
+  return {
+    ...state,
+    coins: state.coins - cost,
+    mine: { ...state.mine, picks: state.mine.picks + qty },
   };
 }
 

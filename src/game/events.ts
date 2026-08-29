@@ -36,7 +36,19 @@ export interface LevelLosePayload {
 }
 
 export type TownTileKind =
-  "plot" | "factory" | "order" | "market" | "animal" | "train" | "plane" | "barn" | "build";
+  | "plot"
+  | "factory"
+  | "order"
+  | "market"
+  | "animal"
+  | "train"
+  | "plane"
+  | "barn"
+  | "build"
+  | "mine"
+  | "zoo"
+  | "harbor"
+  | "achievements";
 
 export interface TownTileTappedPayload {
   kind: TownTileKind;
