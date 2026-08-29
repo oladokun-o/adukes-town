@@ -14,77 +14,124 @@ import { cropStage } from "@/game/city/timers";
 import type { CityState } from "@/game/city/types";
 import { emitGameEvent, GameEvents, type TownTileKind } from "@/game/events";
 import { FARM_GRID_WIDTH } from "@/game/town/config";
-import { gridToScreen, plotIdToGrid, TILE_WIDTH, type GridPosition } from "@/game/town/layout";
+import {
+  gridToScreen,
+  plotIdToGrid,
+  TILE_HEIGHT,
+  TILE_WIDTH,
+  type GridPosition,
+} from "@/game/town/layout";
 
 const ASSET_BASE = "/assets/town/";
 
-// Keys are namespaced (town-*) since these share Phaser's global texture
-// manager with BoardScene's procedural piece textures.
-const TEXTURES = {
-  soil: "town-soil",
+// Kenney "Isometric Tiles" family (Buildings + Landscape packs), CC0 — a
+// coherent flat-isometric set. Ground tiles are a 132-wide diamond; whole
+// buildings are single sprites that stand on that same diamond. See
+// public/assets/town/CREDITS.txt.
+const T = {
+  fountain: "town-fountain",
+  bPlain: "town-b-plain",
+  bBakery: "town-b-bakery",
+  bShop: "town-b-shop",
+  bBarn: "town-b-barn",
+  bCivic: "town-b-civic",
+  bCottage: "town-b-cottage",
+  bHall: "town-b-hall",
+  bHouse: "town-b-house",
+  bHouse2: "town-b-house2",
+  bHouse3: "town-b-house3",
+  bBooth: "town-b-booth",
   cropSprout: "town-crop-sprout",
   cropGrowing: "town-crop-growing",
   cropFull: "town-crop-full",
-  fence: "town-fence",
 } as const;
 
-// These Kenney sprites are a 256x512 canvas each, grabbed from two different
-// packs so they DON'T share a footprint — measured opaque bottom padding per
-// texture (px above the canvas bottom the content ends). Shift a sprite down
-// by this so its visible base sits on the tile anchor. `soil` reaches the
-// bottom (0).
-const BASELINE_PAD: Record<string, number> = {
-  [TEXTURES.cropSprout]: 30,
-  [TEXTURES.cropGrowing]: 30,
-  [TEXTURES.cropFull]: 23,
-  [TEXTURES.fence]: 20,
+const TEXTURE_FILES: Record<string, string> = {
+  [T.fountain]: "iso/fountain.png",
+  [T.bPlain]: "iso/b-plain.png",
+  [T.bBakery]: "iso/b-bakery.png",
+  [T.bShop]: "iso/b-shop.png",
+  [T.bBarn]: "iso/b-barn.png",
+  [T.bCivic]: "iso/b-civic.png",
+  [T.bCottage]: "iso/b-cottage.png",
+  [T.bHall]: "iso/b-hall.png",
+  [T.bHouse]: "iso/b-house.png",
+  [T.bHouse2]: "iso/b-house2.png",
+  [T.bHouse3]: "iso/b-house3.png",
+  [T.bBooth]: "iso/b-booth.png",
+  [T.cropSprout]: "crop-sprout.png",
+  [T.cropGrowing]: "crop-growing.png",
+  [T.cropFull]: "crop-full.png",
+};
+
+// Vertical origin per texture: the fraction down the sprite where the tile's
+// footprint centre sits, so every sprite placed at the same grid point lines
+// up on the same diamond. Ground tiles (132x99) anchor near their top; the
+// taller building sprites anchor near their base.
+const ORIGIN_Y: Record<string, number> = {
+  [T.fountain]: 0.62,
+  [T.bPlain]: 0.82,
+  [T.bBakery]: 0.82,
+  [T.bShop]: 0.82,
+  [T.bBarn]: 0.82,
+  [T.bCivic]: 0.82,
+  [T.bCottage]: 0.82,
+  [T.bHall]: 0.82,
+  [T.bBooth]: 0.82,
+  [T.bHouse]: 0.72,
+  [T.bHouse2]: 0.72,
+  [T.bHouse3]: 0.72,
+};
+
+// The small house tiles are drawn on a 99-wide canvas; scale them up to sit
+// on the 132-wide grid like the rest.
+const BUILDING_SCALE = 0.82;
+const SCALE: Record<string, number> = {
+  [T.bHouse]: 1.1,
+  [T.bHouse2]: 1.1,
+  [T.bHouse3]: 1.1,
+  [T.cropSprout]: 0.26,
+  [T.cropGrowing]: 0.26,
+  [T.cropFull]: 0.26,
 };
 
 const DRAG_THRESHOLD_PX = 6;
 const MIN_ZOOM = 0.3;
-const MAX_ZOOM = 2;
+const MAX_ZOOM = 2.4;
 const WHEEL_ZOOM_STEP = 0.1;
-
-const SPRITE_HEIGHT = 512;
-// The soil diamond is ~256 wide x ~140 tall at the very bottom of the
-// canvas. Interactive sprites use this band (not the full padded 256x512
-// frame) so neighbouring tiles' invisible hit boxes don't steal taps.
-const GROUND_HIT = new Phaser.Geom.Rectangle(0, SPRITE_HEIGHT - 140, TILE_WIDTH, 140);
-
-interface StackLayer {
-  texture: string;
-  tint?: number;
-  scale?: number;
-}
 
 interface BuildingSpec {
   pos: GridPosition;
   kind: TownTileKind;
   id: string;
-  emoji: string;
+  texture: string;
+  // Small glyph drawn on the roof for the abstract tiles that have no
+  // dedicated building art (orders / train / mine / …).
+  badge?: string;
   label: string;
-  tint: number;
 }
 
-const FACTORY_EMOJI: Record<string, string> = {
-  mill: "🌾",
-  bakery: "🥖",
-  feed_mill: "🌰",
-  sugar_mill: "🍥",
-  textile_mill: "🧵",
-  juice_press: "🧃",
-  tailor: "👒",
-  cannery: "🥫",
-  kitchen: "🍲",
-  confectionery: "🍰",
-  chocolate_maker: "🍫",
+const FACTORY_TEXTURE: Record<string, string> = {
+  mill: T.bPlain,
+  bakery: T.bBakery,
+  feed_mill: T.bPlain,
+  sugar_mill: T.bShop,
+  textile_mill: T.bPlain,
+  juice_press: T.bShop,
+  tailor: T.bShop,
+  cannery: T.bPlain,
+  kitchen: T.bBakery,
+  confectionery: T.bBakery,
+  chocolate_maker: T.bShop,
 };
 
-// The town occupies a compact rectangular block to the right of the farm:
-// service buildings (factories in unlock order, pens, the fixed stalls)
-// first, then every structure the player has built. Packed row-major
-// TOWN_BLOCK_WIDTH tiles wide so it stays a town, not a diagonal sprawl.
+const HOUSE_TEXTURES = [T.bHouse, T.bHouse2, T.bHouse3];
+
+// The town sits to the right of the farm as a loose grid — buildings are a
+// full tile wide, so they're spaced > 1 cell apart to read as a street
+// rather than a heap.
 const TOWN_BLOCK_WIDTH = 3;
+const TOWN_SPACING = 1.5;
 
 function buildingsFor(state: CityState): BuildingSpec[] {
   const level = state.level;
@@ -95,65 +142,77 @@ function buildingsFor(state: CityState): BuildingSpec[] {
       .map((f) => ({
         kind: "factory" as const,
         id: f.id,
-        emoji: FACTORY_EMOJI[f.id] ?? "🏭",
+        texture: FACTORY_TEXTURE[f.id] ?? T.bPlain,
         label: f.name,
-        tint: 0xcdb98f,
       })),
     ...animalPensUnlockedAt(level)
       .sort((a, b) => a.unlockLevel - b.unlockLevel)
       .map((p) => ({
         kind: "animal" as const,
         id: p.id,
-        emoji: p.emoji,
+        texture: T.bCottage,
+        badge: p.emoji,
         label: p.name,
-        tint: 0xc7e4a8,
       })),
-    { kind: "barn", id: "barn", emoji: "🛖", label: "Barn", tint: 0xd8b98a },
-    { kind: "order", id: "order", emoji: "🚁", label: "Orders", tint: 0xbfe0ff },
+    { kind: "barn", id: "barn", texture: T.bBarn, badge: "🛖", label: "Barn" },
+    { kind: "order", id: "order", texture: T.bBooth, badge: "🚁", label: "Orders" },
     ...(level >= TRAIN_UNLOCK_LEVEL
-      ? [{ kind: "train" as const, id: "train", emoji: "🚂", label: "Train", tint: 0xc9c9c9 }]
+      ? [{ kind: "train" as const, id: "train", texture: T.bBooth, badge: "🚂", label: "Train" }]
       : []),
     ...(level >= PLANE_UNLOCK_LEVEL
-      ? [{ kind: "plane" as const, id: "plane", emoji: "✈️", label: "Plane", tint: 0xd7e8ff }]
+      ? [{ kind: "plane" as const, id: "plane", texture: T.bBooth, badge: "✈️", label: "Plane" }]
       : []),
-    { kind: "market", id: "market", emoji: "🏪", label: "Market", tint: 0xffd9a8 },
-    { kind: "build", id: "build", emoji: "🏗️", label: "Build", tint: 0xe8d8c0 },
-    { kind: "achievements", id: "achievements", emoji: "🏆", label: "Awards", tint: 0xffe9a8 },
-    { kind: "npc", id: "square", emoji: "🧑‍🤝‍🧑", label: "Square", tint: 0xf2d9c2 },
+    { kind: "market", id: "market", texture: T.bShop, badge: "🏪", label: "Market" },
+    { kind: "build", id: "build", texture: T.bBooth, badge: "🏗️", label: "Build" },
+    {
+      kind: "achievements",
+      id: "achievements",
+      texture: T.bBooth,
+      badge: "🏆",
+      label: "Awards",
+    },
+    { kind: "npc", id: "square", texture: T.bHall, badge: "🧑‍🤝‍🧑", label: "Square" },
     ...(level >= MINE_UNLOCK_LEVEL
-      ? [{ kind: "mine" as const, id: "mine", emoji: "⛏️", label: "Mine", tint: 0x9c8f83 }]
+      ? [{ kind: "mine" as const, id: "mine", texture: T.bBooth, badge: "⛏️", label: "Mine" }]
       : []),
     ...(level >= ZOO_UNLOCK_LEVEL
-      ? [{ kind: "zoo" as const, id: "zoo", emoji: "🦁", label: "Zoo", tint: 0xc7e4a8 }]
+      ? [{ kind: "zoo" as const, id: "zoo", texture: T.bCottage, badge: "🦁", label: "Zoo" }]
       : []),
     ...(level >= HARBOR_UNLOCK_LEVEL
-      ? [{ kind: "harbor" as const, id: "harbor", emoji: "⚓", label: "Harbor", tint: 0xbfe0ff }]
+      ? [{ kind: "harbor" as const, id: "harbor", texture: T.bBooth, badge: "⚓", label: "Harbor" }]
       : []),
     ...playerStructures(state),
   ];
   return specs.map((s, i) => ({
     ...s,
     pos: {
-      col: col0 + (i % TOWN_BLOCK_WIDTH),
-      row: Math.floor(i / TOWN_BLOCK_WIDTH),
+      col: col0 + (i % TOWN_BLOCK_WIDTH) * TOWN_SPACING,
+      row: Math.floor(i / TOWN_BLOCK_WIDTH) * TOWN_SPACING,
     },
   }));
 }
 
-// One billboard per placed building (expanded by count). Tapping any of them
-// opens the Build panel.
+// One sprite per placed building (expanded by count). Tapping any opens the
+// Build panel.
 function playerStructures(state: CityState): Omit<BuildingSpec, "pos">[] {
   const out: Omit<BuildingSpec, "pos">[] = [];
+  let houseIndex = 0;
   for (const [id, count] of Object.entries(state.buildings)) {
     const def = getBuilding(id);
     if (!def) continue;
     for (let i = 0; i < count; i++) {
+      const texture =
+        def.kind === "house"
+          ? HOUSE_TEXTURES[houseIndex++ % HOUSE_TEXTURES.length]
+          : def.kind === "community"
+            ? T.bCivic
+            : T.fountain;
       out.push({
         kind: "build",
         id: `building:${id}:${i}`,
-        emoji: def.emoji,
+        texture,
+        badge: def.kind === "decoration" ? def.emoji : undefined,
         label: def.name,
-        tint: def.kind === "house" ? 0xf2d6b3 : def.kind === "community" ? 0xcfe0f5 : 0xe6f0cf,
       });
     }
   }
@@ -163,13 +222,8 @@ function playerStructures(state: CityState): Omit<BuildingSpec, "pos">[] {
 export class TownScene extends Phaser.Scene {
   private cityState!: CityState;
   private unsubscribeCityState: (() => void) | null = null;
-  // Plain scene-level objects, not a Container — Container children render in
-  // list order, not depth order, which would break the stacking below.
-  private sprites: Phaser.GameObjects.Image[] = [];
-  private labels: Phaser.GameObjects.Text[] = [];
-  // Graphics/shape decor (ground, shadows, sign cards) — redrawn each
-  // render, kept apart from `sprites` so frameCamera() only measures tiles.
-  private decor: Phaser.GameObjects.GameObject[] = [];
+  private objects: Phaser.GameObjects.GameObject[] = [];
+  private tileBounds = new Phaser.Geom.Rectangle();
 
   private isDragging = false;
   private dragStart = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
@@ -179,13 +233,7 @@ export class TownScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const [key, file] of Object.entries({
-      [TEXTURES.soil]: "soil.png",
-      [TEXTURES.cropSprout]: "crop-sprout.png",
-      [TEXTURES.cropGrowing]: "crop-growing.png",
-      [TEXTURES.cropFull]: "crop-full.png",
-      [TEXTURES.fence]: "fence.png",
-    })) {
+    for (const [key, file] of Object.entries(TEXTURE_FILES)) {
       this.load.image(key, `${ASSET_BASE}${file}`);
     }
   }
@@ -215,122 +263,185 @@ export class TownScene extends Phaser.Scene {
   // A fixed sky gradient + soft sun, pinned to the camera (drawn once).
   private buildAtmosphere(): void {
     const cam = this.cameras.main;
-    const w = Math.max(cam.width, 2000);
-    const h = Math.max(cam.height, 1400);
-    const sky = this.add.graphics().setScrollFactor(0).setDepth(-2000);
-    sky.fillGradientStyle(0x9ad3ec, 0x9ad3ec, 0xd8ecdf, 0xd8ecdf, 1);
+    const w = Math.max(cam.width, 2400);
+    const h = Math.max(cam.height, 1600);
+    const sky = this.add.graphics().setScrollFactor(0).setDepth(-10_000);
+    sky.fillGradientStyle(0x9ad3ec, 0x9ad3ec, 0xdcefe0, 0xdcefe0, 1);
     sky.fillRect(-w, -h, w * 3, h * 3);
     this.add
-      .circle(w * 0.22, h * 0.22, Math.min(w, h) * 0.14, 0xfff4cf, 0.55)
+      .circle(w * 0.2, h * 0.18, Math.min(w, h) * 0.13, 0xfff4cf, 0.5)
       .setScrollFactor(0)
-      .setDepth(-1999);
-    // sky + sun persist for the scene's life; scene shutdown cleans them up.
+      .setDepth(-9999);
   }
 
-  // Full redraw on every city-state change — the town is small enough that
-  // diffing isn't worth the complexity yet.
+  private clearObjects(): void {
+    for (const o of this.objects) o.destroy();
+    this.objects = [];
+  }
+
+  private isoDepth(pos: GridPosition, bump = 0): number {
+    return (pos.col + pos.row) * 100 + bump;
+  }
+
+  // The four screen-space corners of a grid rectangle [c0..c1] x [r0..r1].
+  private isoQuad(c0: number, r0: number, c1: number, r1: number): number[] {
+    const a = gridToScreen({ col: c0, row: r0 });
+    const b = gridToScreen({ col: c1 + 1, row: r0 });
+    const c = gridToScreen({ col: c1 + 1, row: r1 + 1 });
+    const d = gridToScreen({ col: c0, row: r1 + 1 });
+    return [a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y];
+  }
+
+  // The diamond outline of a single grid cell, as flat [x,y,...] points.
+  private cellDiamond(pos: GridPosition): number[] {
+    const p = gridToScreen(pos);
+    const hw = TILE_WIDTH / 2;
+    const hh = TILE_HEIGHT / 2;
+    return [p.x, p.y - hh, p.x + hw, p.y, p.x, p.y + hh, p.x - hw, p.y];
+  }
+
+  // Full redraw on every city-state change.
   private renderTown(): void {
-    for (const sprite of this.sprites) sprite.destroy();
-    for (const label of this.labels) label.destroy();
-    for (const d of this.decor) d.destroy();
-    this.sprites = [];
-    this.labels = [];
-    this.decor = [];
+    this.clearObjects();
+    this.tileBounds.setEmpty();
 
-    this.renderGround();
+    const buildings = buildingsFor(this.cityState);
+    const plotCells = this.cityState.plots
+      .map((p) => plotIdToGrid(p.id))
+      .filter((g): g is GridPosition => g !== null);
+    const cells = [...plotCells, ...buildings.map((b) => b.pos)];
+    const minC = Math.min(...cells.map((c) => c.col));
+    const maxC = Math.max(...cells.map((c) => c.col));
+    const minR = Math.min(...cells.map((c) => c.row));
+    const maxR = Math.max(...cells.map((c) => c.row));
 
-    for (const plot of this.cityState.plots) {
-      const gridPos = plotIdToGrid(plot.id);
-      if (gridPos) this.renderPlot(gridPos, plot);
+    // 1) Ground — one grass slab with a darker south/east skirt for depth,
+    // then a dirt patch sized to exactly the farm plots.
+    const ground = this.add.graphics().setDepth(-500);
+    ground.fillStyle(0x7fb457, 1);
+    ground.fillPoints(this.toPoints(this.isoQuad(minC - 3, minR - 3, maxC + 3, maxR + 3)), true);
+    ground.fillStyle(0x5f9440, 1);
+    ground.fillPoints(this.toPoints(this.skirt(minC - 3, minR - 3, maxC + 3, maxR + 3)), true);
+    if (plotCells.length > 0) {
+      const fc0 = Math.min(...plotCells.map((c) => c.col));
+      const fc1 = Math.max(...plotCells.map((c) => c.col));
+      const fr0 = Math.min(...plotCells.map((c) => c.row));
+      const fr1 = Math.max(...plotCells.map((c) => c.row));
+      ground.fillStyle(0xc7a06a, 1);
+      ground.fillPoints(this.toPoints(this.isoQuad(fc0, fr0, fc1, fr1)), true);
     }
+    this.objects.push(ground);
 
-    this.renderFenceLine();
-
-    for (const b of buildingsFor(this.cityState)) this.renderBuilding(b);
-  }
-
-  // A soft grass shelf under the whole town so nothing floats on the sky.
-  private renderGround(): void {
-    const pts: { x: number; y: number }[] = [];
+    // 2) Farm plots.
     for (const plot of this.cityState.plots) {
       const g = plotIdToGrid(plot.id);
-      if (g) pts.push(gridToScreen(g));
+      if (g) this.renderPlot(g, plot);
     }
-    for (const b of buildingsFor(this.cityState)) pts.push(gridToScreen(b.pos));
-    if (pts.length === 0) return;
 
-    const minX = Math.min(...pts.map((p) => p.x)) - TILE_WIDTH * 1.1;
-    const maxX = Math.max(...pts.map((p) => p.x)) + TILE_WIDTH * 1.1;
-    const minY = Math.min(...pts.map((p) => p.y)) - TILE_WIDTH * 0.9;
-    const maxY = Math.max(...pts.map((p) => p.y)) + TILE_WIDTH * 0.55;
-
-    const g = this.add.graphics().setDepth(-500);
-    g.fillStyle(0x8bbf63, 1);
-    g.fillRoundedRect(minX, minY, maxX - minX, maxY - minY, TILE_WIDTH * 0.7);
-    g.fillStyle(0x7bb057, 1);
-    g.fillRoundedRect(
-      minX + 14,
-      maxY - TILE_WIDTH * 0.5,
-      maxX - minX - 28,
-      TILE_WIDTH * 0.5,
-      TILE_WIDTH * 0.4,
-    );
-    this.decor.push(g);
+    // 3) Buildings.
+    for (const b of buildings) this.renderBuilding(b);
   }
 
-  // A soft elliptical contact shadow at a ground anchor.
-  private addShadow(x: number, y: number, depth: number, w = TILE_WIDTH * 0.62): void {
-    const shadow = this.add.ellipse(x, y - 6, w, w * 0.34, 0x1c2a17, 0.22).setDepth(depth - 0.5);
-    this.decor.push(shadow);
+  private toPoints(flat: number[]): Phaser.Math.Vector2[] {
+    const out: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < flat.length; i += 2) {
+      out.push(new Phaser.Math.Vector2(flat[i], flat[i + 1]));
+    }
+    return out;
   }
 
-  // The Kenney building sprites in this grab-bag set don't ground-anchor
-  // cleanly, so buildings are a tinted tile + an emoji billboard for now —
-  // honest placeholder art; a cohesive isometric building set comes with
-  // the Phase 5 town view / Phase 9 art pass.
+  // A thin band along the south + east edges of the ground quad, so the
+  // slab reads as having a little height.
+  private skirt(c0: number, r0: number, c1: number, r1: number): number[] {
+    const a = gridToScreen({ col: c1 + 1, row: r0 });
+    const b = gridToScreen({ col: c1 + 1, row: r1 + 1 });
+    const c = gridToScreen({ col: c0, row: r1 + 1 });
+    const drop = 18;
+    return [a.x, a.y, a.x, a.y + drop, b.x, b.y + drop, c.x, c.y + drop, c.x, c.y, b.x, b.y];
+  }
+
+  private renderPlot(pos: GridPosition, plot: CityState["plots"][number]): void {
+    const depth = this.isoDepth(pos, -10);
+    const diamond = this.cellDiamond(pos);
+    const g = this.add.graphics().setDepth(depth);
+    if (plot.unlocked) {
+      g.fillStyle(0x8a5f38, 0.35);
+      g.fillPoints(this.toPoints(diamond), true);
+      g.lineStyle(2, 0x6b4a2c, 0.55);
+    } else {
+      g.fillStyle(0x2b3320, 0.28);
+      g.fillPoints(this.toPoints(diamond), true);
+      g.lineStyle(2, 0x3d4a2c, 0.5);
+    }
+    g.strokePoints(this.toPoints(diamond), true);
+    g.setInteractive(new Phaser.Geom.Polygon(diamond), Phaser.Geom.Polygon.Contains);
+    g.input!.cursor = "pointer";
+    g.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      if (this.movedTooFar(pointer)) return;
+      emitGameEvent(GameEvents.TownTileTapped, { kind: "plot", id: plot.id });
+    });
+    this.objects.push(g);
+    this.growBounds(pos);
+
+    if (!plot.unlocked) return;
+    const stage = cropStage(plot.planting?.timer ?? null, Date.now());
+    const cropTex =
+      stage === "sprout"
+        ? T.cropSprout
+        : stage === "growing"
+          ? T.cropGrowing
+          : stage === "full"
+            ? T.cropFull
+            : null;
+    if (!cropTex) return;
+    const screen = gridToScreen(pos);
+    const crop = this.add.image(screen.x, screen.y - 2, cropTex);
+    crop
+      .setOrigin(0.5, 0.88)
+      .setScale(SCALE[cropTex])
+      .setDepth(depth + 1);
+    this.objects.push(crop);
+  }
+
   private renderBuilding(b: BuildingSpec): void {
     const screen = gridToScreen(b.pos);
-    const depth = screen.y * 10;
+    const depth = this.isoDepth(b.pos, 10);
 
-    this.addShadow(screen.x, screen.y, depth);
+    const shadow = this.add
+      .ellipse(screen.x, screen.y + 2, TILE_WIDTH * 0.72, TILE_WIDTH * 0.36, 0x1c2a17, 0.16)
+      .setDepth(depth - 1);
+    this.objects.push(shadow);
 
-    const tile = this.add.image(screen.x, screen.y, TEXTURES.soil);
-    tile.setOrigin(0.5, 1).setScale(0.95).setTint(b.tint).setDepth(depth);
-    tile.setInteractive(GROUND_HIT, Phaser.Geom.Rectangle.Contains);
-    tile.input!.cursor = "pointer";
-    tile.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+    const img = this.add.image(screen.x, screen.y, b.texture);
+    img.setOrigin(0.5, ORIGIN_Y[b.texture] ?? 0.8).setDepth(depth);
+    img.setScale((SCALE[b.texture] ?? 1) * BUILDING_SCALE);
+    img.setInteractive({ useHandCursor: true, pixelPerfect: true });
+    img.on("pointerup", (pointer: Phaser.Input.Pointer) => {
       if (this.movedTooFar(pointer)) return;
       emitGameEvent(GameEvents.TownTileTapped, { kind: b.kind, id: b.id });
     });
-    this.sprites.push(tile);
+    this.objects.push(img);
+    Phaser.Geom.Rectangle.Union(this.tileBounds, img.getBounds(), this.tileBounds);
 
-    // A little rounded "sign" so the emoji reads as a building, not a
-    // floating glyph. Post + card.
-    const cardW = 118;
-    const cardH = 96;
-    const cardY = screen.y - 34;
-    const card = this.add.graphics().setDepth(depth + 1);
-    card.fillStyle(0x6b4a33, 1);
-    card.fillRect(screen.x - 4, cardY - 10, 8, 26); // post
-    card.fillStyle(0xfff6e9, 1);
-    card.lineStyle(4, 0x6b4a33, 1);
-    card.fillRoundedRect(screen.x - cardW / 2, cardY - cardH, cardW, cardH, 14);
-    card.strokeRoundedRect(screen.x - cardW / 2, cardY - cardH, cardW, cardH, 14);
-    this.decor.push(card);
+    if (b.badge) {
+      const badge = this.add.text(screen.x, screen.y - 70, b.badge, { fontSize: "30px" });
+      badge.setOrigin(0.5, 1).setDepth(depth + 2);
+      this.objects.push(badge);
+    }
+  }
 
-    const emoji = this.add.text(screen.x, cardY - 20, b.emoji, { fontSize: "52px" });
-    emoji.setOrigin(0.5, 1).setDepth(depth + 2);
-    this.labels.push(emoji);
-
-    const label = this.add.text(screen.x, cardY - cardH - 6, b.label, {
-      fontFamily: "Fredoka, system-ui, sans-serif",
-      fontSize: "24px",
-      color: "#ffffff",
-      stroke: "#3a2b22",
-      strokeThickness: 5,
-    });
-    label.setOrigin(0.5, 1).setDepth(depth + 2);
-    this.labels.push(label);
+  private growBounds(pos: GridPosition): void {
+    const p = gridToScreen(pos);
+    Phaser.Geom.Rectangle.Union(
+      this.tileBounds,
+      new Phaser.Geom.Rectangle(
+        p.x - TILE_WIDTH / 2,
+        p.y - TILE_HEIGHT,
+        TILE_WIDTH,
+        TILE_HEIGHT * 2,
+      ),
+      this.tileBounds,
+    );
   }
 
   private movedTooFar(pointer: Phaser.Input.Pointer): boolean {
@@ -340,93 +451,18 @@ export class TownScene extends Phaser.Scene {
     );
   }
 
-  private renderPlot(gridPos: GridPosition, plot: CityState["plots"][number]): void {
-    // Full-size tiles tessellate into one seamless field; locked plots read
-    // by their darker tint and the fence, unlocked ones by tint + crop.
-    const layers: StackLayer[] = [
-      { texture: TEXTURES.soil, tint: plot.unlocked ? 0xd8b98a : 0x6b7169 },
-    ];
-    if (plot.unlocked) {
-      const stage = cropStage(plot.planting?.timer ?? null, Date.now());
-      if (stage === "sprout") layers.push({ texture: TEXTURES.cropSprout });
-      else if (stage === "growing") layers.push({ texture: TEXTURES.cropGrowing });
-      else if (stage === "full") layers.push({ texture: TEXTURES.cropFull });
-    }
-    this.renderStack(gridPos, "plot", plot.id, layers, GROUND_HIT);
-  }
-
-  // A single row of fence sprites along the farm's north edge.
-  private renderFenceLine(): void {
-    for (let col = 0; col < FARM_GRID_WIDTH; col++) {
-      const screen = gridToScreen({ col, row: -1 });
-      const sprite = this.add.image(
-        screen.x,
-        screen.y + BASELINE_PAD[TEXTURES.fence],
-        TEXTURES.fence,
-      );
-      sprite.setOrigin(0.5, 1);
-      sprite.setDepth(screen.y * 10);
-      this.sprites.push(sprite);
-    }
-  }
-
-  // Stacks each layer at one ground anchor. Only the first (ground) layer is
-  // interactive — a tap anywhere on the stack is one tap on the whole tile.
-  private renderStack(
-    gridPos: GridPosition,
-    kind: TownTileKind,
-    id: string,
-    layers: readonly StackLayer[],
-    hitArea: Phaser.Geom.Rectangle = GROUND_HIT,
-  ): void {
-    const screen = gridToScreen(gridPos);
-    const baseDepth = screen.y * 10;
-
-    // A crop standing on the tile gets a small contact shadow; bare soil
-    // in the tessellated field does not.
-    if (layers.length > 1) this.addShadow(screen.x, screen.y, baseDepth, TILE_WIDTH * 0.42);
-
-    layers.forEach(({ texture, tint, scale }, layerIndex) => {
-      const pad = BASELINE_PAD[texture] ?? 0;
-      const sprite = this.add.image(screen.x, screen.y + pad, texture);
-      sprite.setOrigin(0.5, 1);
-      sprite.setDepth(baseDepth + layerIndex);
-      if (scale !== undefined) sprite.setScale(scale);
-      if (tint !== undefined) sprite.setTint(tint);
-
-      if (layerIndex === 0) {
-        sprite.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
-        sprite.input!.cursor = "pointer";
-        sprite.on("pointerup", (pointer: Phaser.Input.Pointer) => {
-          if (this.movedTooFar(pointer)) return;
-          emitGameEvent(GameEvents.TownTileTapped, { kind, id });
-        });
-      }
-
-      this.sprites.push(sprite);
-    });
-  }
-
   // Fit the whole town in view on first load, then leave the camera to the
-  // player. Union every sprite's world bounds and zoom that box to fit.
+  // player.
   private frameCamera(): void {
-    if (this.sprites.length === 0) return;
-    const bounds = this.sprites[0].getBounds();
-    for (const sprite of this.sprites) {
-      Phaser.Geom.Rectangle.Union(bounds, sprite.getBounds(), bounds);
-    }
-    // Building sign cards + labels rise ~200px above their tile and aren't
-    // in `sprites`; grow the box upward so the top row isn't clipped.
-    bounds.y -= 200;
-    bounds.height += 200;
+    const b = Phaser.Geom.Rectangle.Clone(this.tileBounds);
+    if (b.width === 0) return;
+    b.y -= 40;
+    b.height += 40;
     const cam = this.cameras.main;
-    const margin = 1.14;
-    const fit = Math.min(
-      cam.width / (bounds.width * margin),
-      cam.height / (bounds.height * margin),
-    );
+    const margin = 1.2;
+    const fit = Math.min(cam.width / (b.width * margin), cam.height / (b.height * margin));
     cam.setZoom(Phaser.Math.Clamp(fit, MIN_ZOOM, MAX_ZOOM));
-    cam.centerOn(bounds.centerX, bounds.centerY);
+    cam.centerOn(b.centerX, b.centerY);
   }
 
   private setupCameraDrag(): void {

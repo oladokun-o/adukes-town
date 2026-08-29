@@ -1,13 +1,11 @@
 import { FARM_GRID_WIDTH } from "@/game/town/config";
 
 // Isometric grid math for the town view. Tiles are Kenney's "Isometric
-// Miniature" series — 256x512px images, with the diamond ground footprint
-// sitting at the bottom of that canvas (the rest is headroom for whatever
-// stands on the tile). TownScene places sprites with origin (0.5, 1) —
-// bottom-center — so a sprite's bottom-center point should land on the
-// screen point returned here.
-export const TILE_WIDTH = 256;
-export const TILE_HEIGHT = 128; // the diamond's on-screen height
+// Tiles" family — a 132px-wide diamond footprint (2:1 iso, so 66px tall on
+// screen). TownScene anchors every sprite so its footprint centre lands on
+// the screen point returned here (per-texture origin, see ORIGIN_Y there).
+export const TILE_WIDTH = 132;
+export const TILE_HEIGHT = 66; // the diamond's on-screen height
 
 export interface GridPosition {
   col: number;

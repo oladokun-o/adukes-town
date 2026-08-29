@@ -1,19 +1,27 @@
-Isometric town tiles — Kenney.nl, CC0 (public domain, no attribution required)
+Isometric town art — Kenney.nl, CC0 (public domain, no attribution required)
 
-Source packs:
-- Isometric Miniature Bases — https://kenney.nl/assets/isometric-miniature-bases
-- Isometric Miniature Farm — https://kenney.nl/assets/isometric-miniature-farm
+Source packs (https://kenney.nl):
+- Isometric Tiles Buildings  — whole-building tiles (b-*.png below)
+- Isometric Tiles Landscape  — ground / fountain tiles
+- Isometric Miniature Farm   — the corn crop sprites (crop-*.png)
 
-Only the sprites actually used in-game were kept (renamed from Kenney's
-original filenames below, all "_S" rotation variant):
+iso/ (the current town set — Kenney originals renamed):
+  b-plain.png    <- buildingTiles_011   generic factory / mill
+  b-bakery.png   <- buildingTiles_004   awning shopfront (bakery / kitchen)
+  b-shop.png     <- buildingTiles_034   columned storefront (market / press)
+  b-barn.png     <- buildingTiles_021   arched cottage (barn)
+  b-civic.png    <- buildingTiles_025   solid-red civic building (community)
+  b-cottage.png  <- buildingTiles_014   arched cottage (animal pens / zoo)
+  b-hall.png     <- buildingTiles_029   arched hall (town square)
+  b-house.png    <- buildingTiles_044   small house  (built houses)
+  b-house2.png   <- buildingTiles_048   small house
+  b-house3.png   <- buildingTiles_052   small house
+  b-booth.png    <- buildingTiles_085   plain kiosk (orders / train / mine / …)
+  fountain.png   <- landscapeTiles_100  fountain (built decorations)
 
-  ground-grass.png   <- square_grass_flat_S.png   (Bases)
-  soil.png            <- dirtFarmland_S.png         (Farm)
-  crop-sprout.png      <- cornYoung_S.png            (Farm)
-  crop-growing.png     <- corn_S.png                 (Farm)
-  crop-full.png        <- cornDouble_S.png           (Farm)
-  fence.png            <- fenceLow_S.png             (Farm)
-  wall-door.png        <- woodWallDoorClosed_S.png   (Farm)
-  roof-barn.png        <- roofSingleWall_S.png       (Farm)
-  roof-house.png        <- roofSingle_S.png           (Farm)
-  crate.png             <- sacksCrate_S.png           (Farm)
+crop-sprout/growing/full.png  <- Isometric Miniature Farm cornYoung / corn /
+                                 cornDouble ("_S" rotation)
+
+Older Isometric Miniature "Bases" + "Farm" sprites (soil.png, fence.png,
+ground-grass.png, roof/wall/crate) are kept for reference but no longer
+rendered — TownScene draws the ground as a flat iso slab now.
