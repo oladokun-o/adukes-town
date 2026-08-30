@@ -5,6 +5,7 @@
 
   let { onComplete }: { onComplete: () => void } = $props();
 
+  let step: "intro" | "account" = $state("intro");
   let mode: "create" | "login" = $state("create");
   let username = $state("");
   let code = $state("");
@@ -65,48 +66,68 @@
 </script>
 
 <div class="onboarding">
-  <h1>Welcome to Aduke's Town</h1>
+  {#if step === "intro"}
+    <div class="intro">
+      <span class="crest">🏡</span>
+      <h1>Aduke's Town</h1>
+      <p>
+        A little town that grows the way you do — plant things and wait for them, build a place
+        where people belong, and remember what matters to the folks who live here.
+      </p>
+      <p class="soft">
+        And the match-3? It never sends you away with nothing. Lose a level and you still keep the
+        progress — no lost lives, no wasted afternoon.
+      </p>
+      <button type="button" class="go" onclick={() => (step = "account")}>Begin →</button>
+    </div>
+  {:else}
+    <h1>Just one thing first</h1>
+    <p class="soft account-intro">
+      Pick a name and a code — that's all it takes for your town to follow you to any phone or
+      laptop.
+    </p>
 
-  <div class="mode-toggle" role="tablist">
-    <button type="button" class:active={mode === "create"} onclick={() => switchMode("create")}>
-      New player
-    </button>
-    <button type="button" class:active={mode === "login"} onclick={() => switchMode("login")}>
-      I already have an account
-    </button>
-  </div>
+    <div class="mode-toggle" role="tablist">
+      <button type="button" class:active={mode === "create"} onclick={() => switchMode("create")}>
+        New player
+      </button>
+      <button type="button" class:active={mode === "login"} onclick={() => switchMode("login")}>
+        I already have an account
+      </button>
+    </div>
 
-  <form onsubmit={submit}>
-    <label>
-      Username
-      <input type="text" bind:value={username} autocomplete="username" />
-    </label>
-
-    <label>
-      {mode === "create" ? "Choose a code" : "Your code"}
-      <input
-        type="password"
-        bind:value={code}
-        autocomplete={mode === "create" ? "new-password" : "current-password"}
-      />
-    </label>
-
-    {#if mode === "create"}
+    <form onsubmit={submit}>
       <label>
-        Confirm code
-        <input type="password" bind:value={confirmCode} autocomplete="new-password" />
+        Username
+        <input type="text" bind:value={username} autocomplete="username" />
       </label>
-      <p class="hint">Remember this — you'll need it to restore your save on another device.</p>
-    {/if}
 
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
+      <label>
+        {mode === "create" ? "Choose a code" : "Your code"}
+        <input
+          type="password"
+          bind:value={code}
+          autocomplete={mode === "create" ? "new-password" : "current-password"}
+        />
+      </label>
 
-    <button type="submit" disabled={submitting}>
-      {submitting ? "One moment…" : mode === "create" ? "Start playing" : "Restore my save"}
-    </button>
-  </form>
+      {#if mode === "create"}
+        <label>
+          Confirm code
+          <input type="password" bind:value={confirmCode} autocomplete="new-password" />
+        </label>
+        <p class="hint">Remember this — you'll need it to restore your save on another device.</p>
+      {/if}
+
+      {#if error}
+        <p class="error">{error}</p>
+      {/if}
+
+      <button type="submit" disabled={submitting}>
+        {submitting ? "One moment…" : mode === "create" ? "Start playing" : "Restore my save"}
+      </button>
+    </form>
+  {/if}
 </div>
 
 <style>
@@ -126,11 +147,14 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
     gap: 1.25rem;
-    max-width: 24rem;
-    margin: 0 auto;
-    padding: 3rem 1rem;
+    padding: 3rem 1rem calc(3rem + env(safe-area-inset-bottom));
     box-sizing: border-box;
+  }
+
+  .onboarding > * {
+    width: min(24rem, 90vw);
   }
 
   h1 {
@@ -139,6 +163,56 @@
     font-size: 1.5rem;
     color: var(--ink);
     text-align: center;
+  }
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    text-align: center;
+  }
+
+  .crest {
+    font-size: 3rem;
+  }
+
+  .intro p,
+  .account-intro {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  .intro p.soft,
+  p.soft {
+    color: rgba(58, 43, 34, 0.7);
+    font-size: 0.88rem;
+  }
+
+  .account-intro {
+    text-align: center;
+  }
+
+  .go {
+    margin-top: 0.4rem;
+    border: none;
+    border-radius: 999px;
+    padding: 0.8rem 2rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--sun);
+    cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .go:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   }
 
   .mode-toggle {
