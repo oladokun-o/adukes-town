@@ -143,7 +143,17 @@ body {
   }
 }
 
-#hud > * {
+/* Same rule as the city HUD: the bar stretches full-width but is mostly
+   empty, so it must stay transparent to touches — only the real controls
+   (the pause button, the pills) opt back in. A full-width wrapper with
+   pointer-events: auto eats taps meant for the board underneath. */
+#hud {
+  pointer-events: none;
+}
+
+#hud button,
+#moves,
+#goal {
   pointer-events: auto;
 }
 

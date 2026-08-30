@@ -382,7 +382,27 @@
     pointer-events: none;
   }
 
-  .hud > * {
+  /* The HUD wrapper and its layout containers (header, the badge and action
+     rows) stretch the full viewport width but are visually almost entirely
+     empty. They must stay transparent to touches so taps fall through to the
+     town canvas underneath — only the real controls opt back in. Giving a
+     full-width wrapper pointer-events: auto silently eats every tap over the
+     farm plots and buildings that render behind it (very visible on iOS,
+     where it made the whole upper half of the town uninteractable). */
+  .hud,
+  .hud header,
+  .hud .badges,
+  .hud .actions-row,
+  .hud .backup-disclosure {
+    pointer-events: none;
+  }
+
+  .hud button,
+  .hud a,
+  .hud summary,
+  .hud label,
+  .hud input,
+  .hud select {
     pointer-events: auto;
   }
 
