@@ -444,31 +444,45 @@ export class TownScene extends Phaser.Scene {
 
   // Simple grown-in-Graphics crop rows so the style matches the flat-iso
   // ground; three stages driven by cropStage().
+  // Planted rows drawn as lumpy foliage running along one iso axis of the
+  // plot diamond — three parallel rows, back-to-front, with golden ears at
+  // the full stage. Point at (af along col-axis, bf along row-axis):
+  //   x = s.x + (af - bf) * hw,  y = s.y + (af + bf) * hh
   private drawCrop(pos: GridPosition, stage: "sprout" | "growing" | "full", depth: number): void {
     const s = gridToScreen(pos);
     const g = this.add.graphics().setDepth(depth);
-    const rows = 3;
-    const cols = 3;
-    const [tuftH, colour, tip] =
+    const hw = TILE_WIDTH / 2;
+    const hh = TILE_HEIGHT / 2;
+
+    const [blob, lift, leaf, ear] =
       stage === "sprout"
-        ? [4, 0x6cae57, 0]
+        ? [3.5, 2, 0x7bbb5a, 0]
         : stage === "growing"
-          ? [12, 0x5aa049, 0]
-          : [18, 0xc9b24a, 1];
+          ? [5.5, 4, 0x5aa049, 0]
+          : [6, 5, 0x4f9740, 1];
+
+    const rows = 3;
+    const along = 6;
+    const clumps: { x: number; y: number; k: number }[] = [];
     for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const ox = (c - 1) * 22 + (r - 1) * 11;
-        const oy = (r - 1) * 11 - (c - 1) * 5;
-        const x = s.x + ox;
-        const y = s.y + oy + 4;
-        g.fillStyle(0x000000, 0.12);
-        g.fillEllipse(x, y + 1, 12, 5);
-        g.fillStyle(colour, 1);
-        g.fillRoundedRect(x - 4, y - tuftH, 8, tuftH, 3);
-        if (tip) {
-          g.fillStyle(0xe4d06a, 1);
-          g.fillCircle(x, y - tuftH, 3);
-        }
+      const bf = (r / (rows - 1) - 0.5) * 0.64;
+      for (let t = 0; t < along; t++) {
+        const af = (t / (along - 1) - 0.5) * 0.72;
+        clumps.push({ x: s.x + (af - bf) * hw, y: s.y + (af + bf) * hh + 3, k: af + bf });
+      }
+    }
+    clumps.sort((a, b) => a.k - b.k);
+
+    for (const c of clumps) {
+      g.fillStyle(0x000000, 0.1);
+      g.fillEllipse(c.x, c.y + 1, blob * 2.2, blob * 0.9);
+      g.fillStyle(0x3f7d34, 1);
+      g.fillCircle(c.x, c.y - lift, blob);
+      g.fillStyle(leaf, 1);
+      g.fillCircle(c.x - blob * 0.3, c.y - lift - blob * 0.4, blob * 0.8);
+      if (ear) {
+        g.fillStyle(0xd9c15a, 1);
+        g.fillEllipse(c.x, c.y - lift - blob * 0.9, 2.6, 6);
       }
     }
     this.objects.push(g);
