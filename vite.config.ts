@@ -19,6 +19,14 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon-48.png", "apple-touch-icon.png"],
+      // A new deploy should take over on the next load, not linger behind
+      // a stale cache — the page also reloads on `controllerchange`
+      // (main.ts) so the fresh assets are actually shown.
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+      },
       // iOS PWA constraint (see project docs): display must be standalone
       // for the app to install cleanly to the Home Screen without browser chrome.
       manifest: {

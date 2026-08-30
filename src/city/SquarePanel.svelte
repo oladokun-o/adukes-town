@@ -24,35 +24,35 @@
     onCelebrate: (festivalId: string) => void;
   } = $props();
 
-  let open = $state<CharacterId | null>(null);
+  let openNpc = $derived<CharacterId | null>(null);
 
   let festivals = $derived(celebratableFestivals(state, Date.now()));
-  let profile = $derived(open ? getProfile(open) : null);
-  let rel = $derived(open ? state.story.characters[open] : null);
-  let line = $derived(open ? currentLine(state, open) : null);
-  let known = $derived(open ? discoveredFacts(state, open) : []);
-  let toRemember = $derived(open ? rememberableFacts(state, open) : []);
+  let profile = $derived(openNpc ? getProfile(openNpc) : null);
+  let rel = $derived(openNpc ? state.story.characters[openNpc] : null);
+  let line = $derived(openNpc ? currentLine(state, openNpc) : null);
+  let known = $derived(openNpc ? discoveredFacts(state, openNpc) : []);
+  let toRemember = $derived(openNpc ? rememberableFacts(state, openNpc) : []);
 
   function hearts(n: number): string {
     return "♥".repeat(n) + "♡".repeat(MAX_HEARTS - n);
   }
 </script>
 
-{#if open && profile && rel}
+{#if openNpc && profile && rel}
   <div class="visit">
-    <button type="button" class="back" onclick={() => (open = null)}>← Town Square</button>
+    <button type="button" class="back" onclick={() => (openNpc = null)}>← Town Square</button>
     <h2>{profile.emoji} {profile.name}</h2>
     <p class="role">{profile.role} · <span class="h">{hearts(rel.hearts)}</span></p>
 
     <p class="line">{line ? line.line : `You haven't really talked with ${profile.name} yet.`}</p>
-    <button type="button" class="talk" onclick={() => onTalk(open!)}>Talk</button>
+    <button type="button" class="talk" onclick={() => onTalk(openNpc!)}>Talk</button>
 
     {#if toRemember.length > 0}
       <h3>Remember something</h3>
       <ul class="facts">
         {#each toRemember as fact (fact.id)}
           <li>
-            <button type="button" onclick={() => onRemember(open!, fact.id)}>
+            <button type="button" onclick={() => onRemember(openNpc!, fact.id)}>
               <span>{fact.text}</span>
               <span class="reward">+{REMEMBER_REWARD_COINS} 🪙 · +♥</span>
             </button>
@@ -101,7 +101,7 @@
         {@const c = state.story.characters[id]}
         {@const pending = rememberableFacts(state, id).length}
         <li>
-          <button type="button" onclick={() => (open = id)}>
+          <button type="button" onclick={() => (openNpc = id)}>
             <span class="pemoji">{p.emoji}</span>
             <span class="pmeta">
               <span class="pname">{p.name}</span>

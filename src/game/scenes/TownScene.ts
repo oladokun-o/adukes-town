@@ -48,10 +48,16 @@ const T = {
   bHouse2: "town-b-house2",
   bHouse3: "town-b-house3",
   bBooth: "town-b-booth",
+  cropSprout: "town-crop-sprout",
+  cropGrowing: "town-crop-growing",
+  cropFull: "town-crop-full",
 } as const;
 
 const TEXTURE_FILES: Record<string, string> = {
   [T.fountain]: "iso/fountain.png",
+  [T.cropSprout]: "crop-sprout.png",
+  [T.cropGrowing]: "crop-growing.png",
+  [T.cropFull]: "crop-full.png",
   [T.bPlain]: "iso/b-plain.png",
   [T.bBakery]: "iso/b-bakery.png",
   [T.bShop]: "iso/b-shop.png",
@@ -335,14 +341,6 @@ export class TownScene extends Phaser.Scene {
     ground.fillPoints(this.toPoints(this.isoQuad(gc0, gr0, gc1, gr1)), true);
     ground.fillStyle(0x5f9440, 1);
     ground.fillPoints(this.toPoints(this.skirt(gc0, gr0, gc1, gr1)), true);
-    if (plotCells.length > 0) {
-      const fc0 = Math.min(...plotCells.map((c) => c.col));
-      const fc1 = Math.max(...plotCells.map((c) => c.col));
-      const fr0 = Math.min(...plotCells.map((c) => c.row));
-      const fr1 = Math.max(...plotCells.map((c) => c.row));
-      ground.fillStyle(0xc7a06a, 1);
-      ground.fillPoints(this.toPoints(this.isoQuad(fc0, fr0, fc1, fr1)), true);
-    }
     this.objects.push(ground);
 
     // 2) A sparse ring of trees just outside the content, for a bit of life.
@@ -413,17 +411,42 @@ export class TownScene extends Phaser.Scene {
   private renderPlot(pos: GridPosition, plot: CityState["plots"][number]): void {
     const depth = this.isoDepth(pos, -10);
     const diamond = this.cellDiamond(pos);
+    const p = gridToScreen(pos);
+    const hw = TILE_WIDTH / 2;
+    const hh = TILE_HEIGHT / 2;
     const g = this.add.graphics().setDepth(depth);
+
     if (plot.unlocked) {
-      g.fillStyle(0x8a5f38, 0.35);
+      // Tilled earth with furrow lines along the col-axis.
+      g.fillStyle(0xb07a45, 1);
       g.fillPoints(this.toPoints(diamond), true);
-      g.lineStyle(2, 0x6b4a2c, 0.55);
+      g.lineStyle(2, 0x8a5f38, 1);
+      for (let k = -2; k <= 2; k++) {
+        const bf = (k / 3) * 0.78;
+        const half = (1 - Math.abs(bf)) * 0.76;
+        g.lineBetween(
+          p.x + (-half - bf) * hw,
+          p.y + (-half + bf) * hh,
+          p.x + (half - bf) * hw,
+          p.y + (half + bf) * hh,
+        );
+      }
+      g.lineStyle(2.5, 0x6b4a2c, 1);
+      g.strokePoints(this.toPoints(diamond), true);
     } else {
-      g.fillStyle(0x2b3320, 0.28);
+      // Rough, un-tilled ground — muted and clearly not ready.
+      g.fillStyle(0x8a9a63, 1);
       g.fillPoints(this.toPoints(diamond), true);
-      g.lineStyle(2, 0x3d4a2c, 0.5);
+      g.lineStyle(2, 0x6f7d4c, 1);
+      g.strokePoints(this.toPoints(diamond), true);
+      const lock = this.add
+        .text(p.x, p.y, "🔒", { fontSize: "20px" })
+        .setOrigin(0.5)
+        .setAlpha(0.55)
+        .setDepth(depth + 1);
+      this.objects.push(lock);
     }
-    g.strokePoints(this.toPoints(diamond), true);
+
     g.setInteractive(new Phaser.Geom.Polygon(diamond), Phaser.Geom.Polygon.Contains);
     g.input!.cursor = "pointer";
     g.on("pointerup", (pointer: Phaser.Input.Pointer) => {
@@ -448,44 +471,36 @@ export class TownScene extends Phaser.Scene {
   // plot diamond — three parallel rows, back-to-front, with golden ears at
   // the full stage. Point at (af along col-axis, bf along row-axis):
   //   x = s.x + (af - bf) * hw,  y = s.y + (af + bf) * hh
+  // Four Kenney miniature-corn sprites in a 2x2 iso arrangement on the plot
+  // — chunky, toy-like, immediately reads as a crop. Point at (af along the
+  // col-axis, bf along the row-axis): x = s.x + (af-bf)*hw, y = s.y + (af+bf)*hh.
   private drawCrop(pos: GridPosition, stage: "sprout" | "growing" | "full", depth: number): void {
     const s = gridToScreen(pos);
-    const g = this.add.graphics().setDepth(depth);
     const hw = TILE_WIDTH / 2;
     const hh = TILE_HEIGHT / 2;
+    const tex =
+      stage === "sprout" ? T.cropSprout : stage === "growing" ? T.cropGrowing : T.cropFull;
+    const scale = stage === "sprout" ? 0.18 : stage === "growing" ? 0.21 : 0.25;
 
-    const [blob, lift, leaf, ear] =
-      stage === "sprout"
-        ? [3.5, 2, 0x7bbb5a, 0]
-        : stage === "growing"
-          ? [5.5, 4, 0x5aa049, 0]
-          : [6, 5, 0x4f9740, 1];
-
-    const rows = 3;
-    const along = 6;
-    const clumps: { x: number; y: number; k: number }[] = [];
-    for (let r = 0; r < rows; r++) {
-      const bf = (r / (rows - 1) - 0.5) * 0.64;
-      for (let t = 0; t < along; t++) {
-        const af = (t / (along - 1) - 0.5) * 0.72;
-        clumps.push({ x: s.x + (af - bf) * hw, y: s.y + (af + bf) * hh + 3, k: af + bf });
+    const spots: { x: number; y: number; k: number }[] = [];
+    for (const af of [-0.24, 0.24]) {
+      for (const bf of [-0.24, 0.24]) {
+        spots.push({ x: s.x + (af - bf) * hw, y: s.y + (af + bf) * hh, k: af + bf });
       }
     }
-    clumps.sort((a, b) => a.k - b.k);
+    spots.sort((a, b) => a.k - b.k);
 
-    for (const c of clumps) {
-      g.fillStyle(0x000000, 0.1);
-      g.fillEllipse(c.x, c.y + 1, blob * 2.2, blob * 0.9);
-      g.fillStyle(0x3f7d34, 1);
-      g.fillCircle(c.x, c.y - lift, blob);
-      g.fillStyle(leaf, 1);
-      g.fillCircle(c.x - blob * 0.3, c.y - lift - blob * 0.4, blob * 0.8);
-      if (ear) {
-        g.fillStyle(0xd9c15a, 1);
-        g.fillEllipse(c.x, c.y - lift - blob * 0.9, 2.6, 6);
-      }
+    for (const spot of spots) {
+      this.objects.push(
+        this.add.ellipse(spot.x, spot.y + 2, 24, 11, 0x1c2a17, 0.14).setDepth(depth + spot.k),
+      );
+      const crop = this.add.image(spot.x, spot.y + 4, tex);
+      crop
+        .setOrigin(0.5, 0.9)
+        .setScale(scale)
+        .setDepth(depth + 0.5 + spot.k);
+      this.objects.push(crop);
     }
-    this.objects.push(g);
   }
 
   private renderBuilding(b: BuildingSpec): void {

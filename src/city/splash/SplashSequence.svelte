@@ -2,6 +2,11 @@
   import { onMount } from "svelte";
   import BirthdayCard from "@/city/splash/BirthdayCard.svelte";
   import NxtedgeStudio from "@/city/splash/NxtedgeStudio.svelte";
+  import {
+    playBirthdayFlourish,
+    playStudioChime,
+    resumeAudioContext,
+  } from "@/game/audio/juiceSounds";
 
   let {
     showBirthday,
@@ -14,8 +19,11 @@
   type Beat = "studio" | "birthday";
   let beat = $state<Beat>("studio");
   let finished = false;
+  let studioSounded = false;
 
-  const STUDIO_MS = 2600;
+  // Mobile blocks audio until a user gesture, so the studio sting waits for
+  // a tap to play its chime — with a long fallback so nobody gets stuck.
+  const STUDIO_FALLBACK_MS = 8000;
   const BIRTHDAY_MS = 6500;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -25,10 +33,11 @@
     timer = setTimeout(advance, ms);
   }
 
-  function advance(): void {
+  function next(): void {
     if (finished) return;
     if (beat === "studio" && showBirthday) {
       beat = "birthday";
+      playBirthdayFlourish();
       arm(BIRTHDAY_MS);
       return;
     }
@@ -37,8 +46,22 @@
     onDone();
   }
 
+  // A tap during the studio beat: unlock audio, sound the chime, then move
+  // on after a moment so the sting is actually heard.
+  function advance(): void {
+    if (finished) return;
+    if (beat === "studio" && !studioSounded) {
+      studioSounded = true;
+      resumeAudioContext();
+      playStudioChime();
+      arm(950);
+      return;
+    }
+    next();
+  }
+
   onMount(() => {
-    arm(STUDIO_MS);
+    arm(STUDIO_FALLBACK_MS);
     return () => {
       if (timer) clearTimeout(timer);
     };
@@ -49,6 +72,7 @@
   class="splash"
   role="button"
   tabindex="0"
+  onpointerdown={resumeAudioContext}
   onclick={advance}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && advance()}
 >

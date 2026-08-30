@@ -209,6 +209,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Landscape phones are short — give panels room to breathe and let the
+     backdrop itself scroll if a panel is still taller than the viewport. */
+  padding: clamp(0.5rem, 3vh, 1.5rem) clamp(0.5rem, 3vw, 1.5rem)
+    calc(clamp(0.5rem, 3vh, 1.5rem) + env(safe-area-inset-bottom));
+  overflow-y: auto;
   background: rgba(0, 0, 0, 0.65);
   pointer-events: auto;
 }
@@ -222,11 +227,17 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
+  width: min(24rem, 92vw);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
   background: var(--panel);
   color: var(--ink);
   border: none;
   border-radius: 1.25rem;
-  padding: 2rem 2.5rem;
+  padding: clamp(1.1rem, 4vw, 2rem) clamp(1.1rem, 4vw, 2.5rem);
   text-align: center;
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
 }

@@ -69,12 +69,32 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  // Listen on the window, not just the canvas — the town/board canvas sits
+  // under the transparent #city-app / #hud overlay, and window-level input
+  // is the reliable path for touch to reach Phaser through it.
+  input: { activePointers: 3, windowEvents: true },
   scene: [],
 };
+
+// When a new service worker takes control (a fresh deploy), reload once so
+// the new assets are actually shown — otherwise the page keeps running the
+// old bundle until the user manually reloads a second time.
+if ("serviceWorker" in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+}
 
 const game = new Phaser.Game(config);
 game.scene.add("BoardScene", BoardScene, false);
 game.scene.add("TownScene", TownScene, false);
+// Belt-and-braces: some iOS/Phaser combos leave the canvas with
+// touch-action: auto under Scale.RESIZE, so a drag is stolen as a scroll.
+game.canvas.style.touchAction = "none";
+(game.canvas.style as unknown as { webkitUserSelect?: string }).webkitUserSelect = "none";
 
 // #app is `display: none` while the other view is showing, so Phaser's
 // Scale.RESIZE manager sees a 0x0 parent at boot and after every switch —
