@@ -69,6 +69,7 @@
     resolveBoosterModifiers,
     type ResolvedBoosterModifiers,
   } from "@/game/city/catalog";
+  import { playPanelClose, playPanelOpen, resumeAudioContext } from "@/game/audio/juiceSounds";
   import { GameEvents, offGameEvent, onGameEvent, type TownTileTappedPayload } from "@/game/events";
   import { getNextLevel, levels } from "@/game/levels";
   import { isRelaxModeEnabled, setRelaxModeEnabled } from "@/settings/relaxMode";
@@ -113,12 +114,15 @@
         }
       }
       activeTile = payload;
+      resumeAudioContext();
+      playPanelOpen();
     };
     onGameEvent(GameEvents.TownTileTapped, handleTap);
     return () => offGameEvent(GameEvents.TownTileTapped, handleTap);
   });
 
   function closePanel(): void {
+    if (activeTile) playPanelClose();
     activeTile = null;
   }
 
@@ -127,6 +131,13 @@
     const nextLevel = (last ? getNextLevel(last) : null) ?? levels[0];
     relax = isRelaxModeEnabled();
     match3Entry = { levelId: nextLevel.id, levelName: nextLevel.name };
+    resumeAudioContext();
+    playPanelOpen();
+  }
+
+  function closeMatch3Entry(): void {
+    if (match3Entry) playPanelClose();
+    match3Entry = null;
   }
 
   let activePlot = $derived(
@@ -217,7 +228,7 @@
 </div>
 
 {#if match3Entry}
-  <div class="overlay" role="presentation" onclick={() => (match3Entry = null)}>
+  <div class="overlay" role="presentation" onclick={closeMatch3Entry}>
     <div class="overlay-panel" role="presentation" onclick={(e) => e.stopPropagation()}>
       <Match3Entry
         levelName={match3Entry.levelName}
@@ -229,7 +240,7 @@
         onToggleRelax={toggleRelax}
         onStart={startMatch3}
       />
-      <button type="button" class="close-btn" onclick={() => (match3Entry = null)}>Close</button>
+      <button type="button" class="close-btn" onclick={closeMatch3Entry}>Close</button>
     </div>
   </div>
 {/if}

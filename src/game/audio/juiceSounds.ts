@@ -6,7 +6,7 @@
 // The real OscillatorType is a TS ambient global with no runtime
 // counterpart, so ESLint's no-undef (which only knows globals.browser's
 // runtime globals) doesn't recognize it -- this local alias sidesteps that.
-type Waveform = "sine" | "triangle" | "sawtooth";
+type Waveform = "sine" | "triangle" | "sawtooth" | "square";
 
 let audioContext: AudioContext | null = null;
 let masterGain: GainNode | null = null;
@@ -155,6 +155,123 @@ export function playBuildThunk(): void {
   gain.connect(master);
   osc.start(t);
   osc.stop(t + 0.24);
+}
+
+// --- UI / interaction SFX ------------------------------------------
+// Deliberately quieter and shorter than the reward cues above — these fire
+// on nearly every tap, so they have to sit well under the music of an
+// actual accomplishment. Same synth approach, no audio files.
+
+// A soft click under every button press. Two very short blips an octave
+// apart so it reads as a "tick" rather than a tone.
+export function playUiTap(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  scheduleTone(audio.ctx, audio.master, t, 320, 0.03, "triangle", 0.12);
+  scheduleTone(audio.ctx, audio.master, t + 0.012, 640, 0.04, "triangle", 0.1);
+}
+
+// Panel opens: a quick upward pair. Panel closes / back: the same, reversed.
+export function playPanelOpen(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  [523.25, 783.99].forEach((f, i) =>
+    scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime + i * 0.05, f, 0.1, "sine", 0.16),
+  );
+}
+
+export function playPanelClose(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  [659.25, 440.0].forEach((f, i) =>
+    scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime + i * 0.05, f, 0.1, "sine", 0.16),
+  );
+}
+
+// Planting a seed: a low earthy tap with a tiny bright tick on top.
+export function playPlant(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(180, t);
+  osc.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+  gain.gain.setValueAtTime(0.28, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(t);
+  osc.stop(t + 0.16);
+  scheduleTone(ctx, master, t + 0.03, 880, 0.05, "triangle", 0.12);
+}
+
+// A little cash-register lift for buying something.
+export function playPurchase(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  scheduleTone(ctx, master, t, 784, 0.07, "square", 0.16);
+  scheduleTone(ctx, master, t + 0.07, 1046.5, 0.12, "square", 0.16);
+}
+
+// Denied — an action that couldn't happen (can't afford, no slot free).
+// Low, short, unmistakably a "no" without being harsh.
+export function playError(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  scheduleTone(ctx, master, t, 196, 0.09, "sawtooth", 0.14);
+  scheduleTone(ctx, master, t + 0.09, 155, 0.12, "sawtooth", 0.14);
+}
+
+// Level up — the biggest UI cue, a bright rising major arpeggio.
+export function playLevelUp(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+    scheduleTone(ctx, master, t + i * 0.09, f, 0.4, "triangle", 0.26),
+  );
+  scheduleTone(ctx, master, t + 0.36, 1318.51, 0.5, "sine", 0.22);
+}
+
+// Shimmer for the narrative beats — remembering a fact, claiming an
+// achievement, celebrating a festival.
+export function playSparkle(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  [1046.5, 1318.51, 1567.98, 2093.0].forEach((f, i) =>
+    scheduleTone(ctx, master, t + i * 0.05, f, 0.16, "sine", 0.14),
+  );
+}
+
+// A short whoosh for spending a token to rush a timer, or rerolling.
+export function playWhoosh(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(280, t);
+  osc.frequency.exponentialRampToValueAtTime(900, t + 0.18);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.linearRampToValueAtTime(0.16, t + 0.06);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(t);
+  osc.stop(t + 0.22);
 }
 
 const CREATE_CHIME_NOTES = [523.25, 659.25, 783.99]; // C5, E5, G5

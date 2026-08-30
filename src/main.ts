@@ -3,6 +3,7 @@ import { mountCityApp } from "@/city/mountCityApp";
 import { mountOnboarding } from "@/city/mountOnboarding";
 import { mountInstallGate } from "@/city/splash/mountInstallGate";
 import { mountSplash } from "@/city/splash/mountSplash";
+import { initUiTapSound } from "@/city/uiSound";
 import type { ResolvedBoosterModifiers } from "@/game/city/catalog";
 import { loadCityStateFromDb } from "@/game/city/cityState";
 import { initMatchCoinTie } from "@/game/city/matchTie";
@@ -36,6 +37,10 @@ import {
 // `beforeinstallprompt` can fire before the first await resolves, so start
 // listening for it synchronously, before anything else.
 initInstallCapture();
+
+// One document-wide listener that gives every button a tap sound (and primes
+// the AudioContext on the first interaction anywhere).
+initUiTapSound();
 
 try {
   await Promise.all([

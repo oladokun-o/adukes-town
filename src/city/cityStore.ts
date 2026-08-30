@@ -68,7 +68,13 @@ import {
   playBuildThunk,
   playCoin,
   playCollect,
+  playError,
   playHarvest,
+  playLevelUp,
+  playPlant,
+  playPurchase,
+  playSparkle,
+  playWhoosh,
   resumeAudioContext,
 } from "@/game/audio/juiceSounds";
 
@@ -98,6 +104,8 @@ let lastSeen = getCityState();
 onCityStateChange((next) => {
   if (next.level > lastSeen.level) {
     pushToast(`Level ${next.level}!`, "level", "⭐");
+    resumeAudioContext();
+    playLevelUp();
   }
   lastSeen = next;
   cityState.set(next);
@@ -159,11 +167,24 @@ export const story = derived(cityState, (s) => {
 function dispatch(
   action: (state: CityState, now: number) => CityState,
   onApplied?: (before: CityState, after: CityState) => void,
+  opts?: { sound?: () => void; gated?: boolean },
 ): void {
   const state = getCityState();
   const next = action(state, Date.now());
-  if (next === state) return;
+  if (next === state) {
+    // `gated` actions are ones the player deliberately spends on (buy,
+    // build, rush) — a no-op there means "you couldn't", worth a cue.
+    if (opts?.gated) {
+      resumeAudioContext();
+      playError();
+    }
+    return;
+  }
   onApplied?.(state, next);
+  if (opts?.sound) {
+    resumeAudioContext();
+    opts.sound();
+  }
   storeCityState(next).catch((err: unknown) => {
     console.warn("Aduke's Town: couldn't save city state.", err);
   });
@@ -174,7 +195,7 @@ function coinDelta(before: CityState, after: CityState): number {
 }
 
 export function plant(plotId: string, cropId: string): void {
-  dispatch((state, now) => plantCrop(state, plotId, cropId, now));
+  dispatch((state, now) => plantCrop(state, plotId, cropId, now), undefined, { sound: playPlant });
 }
 
 export function harvest(plotId: string): void {
@@ -193,7 +214,10 @@ export function harvest(plotId: string): void {
 }
 
 export function queueRecipeAction(factoryId: string, recipeId: string): void {
-  dispatch((state, now) => queueRecipe(state, factoryId, recipeId, now));
+  dispatch((state, now) => queueRecipe(state, factoryId, recipeId, now), undefined, {
+    sound: playCollect,
+    gated: true,
+  });
 }
 
 export function collectFactoryAction(factoryId: string): void {
@@ -207,7 +231,10 @@ export function collectFactoryAction(factoryId: string): void {
 }
 
 export function feedPenAction(penId: string): void {
-  dispatch((state, now) => feedPen(state, penId, now));
+  dispatch((state, now) => feedPen(state, penId, now), undefined, {
+    sound: playPlant,
+    gated: true,
+  });
 }
 
 export function collectPenAction(penId: string): void {
@@ -231,11 +258,14 @@ export function fulfill(orderId: string): void {
 }
 
 export function rerollOrderAction(orderId: string): void {
-  dispatch((state) => rerollOrder(state, orderId));
+  dispatch((state) => rerollOrder(state, orderId), undefined, { sound: playWhoosh });
 }
 
 export function loadWagonAction(index: number): void {
-  dispatch((state, now) => loadWagon(state, index, now));
+  dispatch((state, now) => loadWagon(state, index, now), undefined, {
+    sound: playBuildThunk,
+    gated: true,
+  });
 }
 
 export function collectTrainAction(): void {
@@ -246,7 +276,10 @@ export function collectTrainAction(): void {
 }
 
 export function loadPlaneAction(): void {
-  dispatch((state, now) => loadPlane(state, now));
+  dispatch((state, now) => loadPlane(state, now), undefined, {
+    sound: playBuildThunk,
+    gated: true,
+  });
 }
 
 export function collectPlaneAction(): void {
@@ -257,11 +290,11 @@ export function collectPlaneAction(): void {
 }
 
 export function upgradeBarnAction(): void {
-  dispatch((state) => upgradeBarn(state));
+  dispatch((state) => upgradeBarn(state), undefined, { sound: playPurchase, gated: true });
 }
 
 export function buyPlotAction(plotId: string): void {
-  dispatch((state) => buyPlot(state, plotId));
+  dispatch((state) => buyPlot(state, plotId), undefined, { sound: playPurchase, gated: true });
 }
 
 export function buildStructureAction(buildingId: string): void {
@@ -271,6 +304,7 @@ export function buildStructureAction(buildingId: string): void {
       pushToast("New building raised", "reward", "🏗️");
       townFx("build", "build");
     },
+    { gated: true },
   );
 }
 
@@ -278,29 +312,39 @@ export function expandTownAction(): void {
   dispatch(
     (state) => expandTown(state),
     () => pushToast("Land expanded", "reward", "🧱"),
+    { sound: playPurchase, gated: true },
   );
 }
 
 export function buySeedAction(cropId: string, qty: number): void {
-  dispatch((state) => buySeed(state, cropId, qty));
+  dispatch((state) => buySeed(state, cropId, qty), undefined, { sound: playPurchase, gated: true });
 }
 
 export function sellItemAction(itemId: string, qty: number): void {
-  dispatch((state) => sellItem(state, itemId, qty));
+  dispatch((state) => sellItem(state, itemId, qty), undefined, { sound: playCoin, gated: true });
 }
 
 // --- Phase 6 -------------------------------------------------------
 
 export function rushCropAction(plotId: string): void {
-  dispatch((state, now) => rushCrop(state, plotId, now));
+  dispatch((state, now) => rushCrop(state, plotId, now), undefined, {
+    sound: playWhoosh,
+    gated: true,
+  });
 }
 
 export function rushFactoryAction(factoryId: string): void {
-  dispatch((state, now) => rushFactory(state, factoryId, now));
+  dispatch((state, now) => rushFactory(state, factoryId, now), undefined, {
+    sound: playWhoosh,
+    gated: true,
+  });
 }
 
 export function rushPenAction(penId: string): void {
-  dispatch((state, now) => rushPen(state, penId, now));
+  dispatch((state, now) => rushPen(state, penId, now), undefined, {
+    sound: playWhoosh,
+    gated: true,
+  });
 }
 
 export function digMineAction(): void {
@@ -315,18 +359,22 @@ export function digMineAction(): void {
 }
 
 export function buyPicksAction(qty: number): void {
-  dispatch((state) => buyPicks(state, qty));
+  dispatch((state) => buyPicks(state, qty), undefined, { sound: playPurchase, gated: true });
 }
 
 export function buildHabitatAction(habitatId: string): void {
   dispatch(
     (state) => buildHabitat(state, habitatId),
     () => pushToast("New zoo habitat opened", "reward", "🦁"),
+    { sound: playPurchase, gated: true },
   );
 }
 
 export function loadShipAction(): void {
-  dispatch((state, now) => loadShip(state, now));
+  dispatch((state, now) => loadShip(state, now), undefined, {
+    sound: playBuildThunk,
+    gated: true,
+  });
 }
 
 export function collectShipAction(): void {
@@ -340,6 +388,7 @@ export function claimAchievementAction(id: string): void {
   dispatch(
     (state) => claimAchievement(state, id),
     () => pushToast("Achievement claimed", "reward", "🏆"),
+    { sound: playSparkle },
   );
 }
 
@@ -352,6 +401,7 @@ export function claimDailyAction(): void {
         pushToast(after.story.activeSetback.label, "warn", "🌧️");
       }
     },
+    { sound: playSparkle },
   );
 }
 
@@ -359,23 +409,25 @@ export function popBalloonAction(): void {
   dispatch(
     (state, now) => popBalloon(state, now),
     () => pushToast("Gift balloon popped!", "reward", "🎈"),
+    { sound: playSparkle },
   );
 }
 
 export function armBoostersAction(boosterIds: readonly string[]): void {
-  dispatch((state) => armBoosters(state, boosterIds));
+  dispatch((state) => armBoosters(state, boosterIds), undefined, { sound: playSparkle });
 }
 
 // --- Phase 8: narrative ------------------------------------------
 
 export function talkToAction(id: CharacterId): void {
-  dispatch((state) => talkTo(state, id));
+  dispatch((state) => talkTo(state, id), undefined, { sound: playCollect });
 }
 
 export function rememberFactAction(id: CharacterId, factId: string): void {
   dispatch(
     (state) => rememberFact(state, id, factId),
     () => pushToast(`${getProfile(id).name} won't forget that`, "story", getProfile(id).emoji),
+    { sound: playSparkle },
   );
 }
 
@@ -383,6 +435,7 @@ export function celebrateFestivalAction(festivalId: string): void {
   dispatch(
     (state, now) => celebrateFestival(state, festivalId, now),
     () => pushToast("Festival celebrated 🎉", "story", "🎊"),
+    { sound: playSparkle },
   );
 }
 
@@ -390,5 +443,6 @@ export function repairSetbackAction(): void {
   dispatch(
     (state) => repairSetback(state),
     () => pushToast("Repaired — the town bounces back", "story", "🛠️"),
+    { sound: playBuildThunk, gated: true },
   );
 }
