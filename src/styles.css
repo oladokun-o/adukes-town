@@ -17,6 +17,14 @@ html,
 body {
   margin: 0;
   height: 100%;
+  /* Lock the viewport: on touch devices the game canvas needs every drag
+     and tap, so nothing should scroll, rubber-band, or pinch-zoom the page
+     out from under it. */
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   /* The match-3 board keeps its own dark backdrop (set in main.ts's Phaser
      config) for tile contrast — this background is what shows behind the
      city view and match-3 chrome. */
@@ -53,6 +61,15 @@ body {
 #app {
   position: fixed;
   inset: 0;
+}
+
+/* Phaser doesn't always set this itself under Scale.RESIZE — without it,
+   a touch-drag on the board or town is stolen by the browser as a scroll
+   gesture and the game gets no pointermove at all (mouse is unaffected,
+   which is why it only shows on mobile). */
+#app,
+#app canvas {
+  touch-action: none;
 }
 
 #hud {

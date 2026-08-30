@@ -11,7 +11,6 @@
 <div class="card">
   <span class="spark">✨</span>
   <h1>Happy Birthday,<br /><span class="name">Aduke</span> <span class="heart">♥</span></h1>
-  <p class="meaning">Adúké — <em>“the one we compete to cherish.”</em></p>
   <p class="closer">Your town has been waiting for you.</p>
   <span class="hint">tap to begin</span>
 </div>

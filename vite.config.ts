@@ -27,7 +27,11 @@ export default defineConfig({
         description: "A cozy match-3 puzzle game.",
         theme_color: "#ff8fb3",
         background_color: "#1a1a2e",
-        display: "standalone",
+        // Immersive when installed to the Home Screen — no browser chrome,
+        // and `fullscreen` hides the status bar too where the OS allows it
+        // (falls back to standalone / minimal-ui otherwise).
+        display: "fullscreen",
+        display_override: ["fullscreen", "standalone", "minimal-ui"],
         // Landscape-first: the town + match-3 board both want the wider
         // axis. A CSS rotate hint (styles.css) covers the case where the
         // OS ignores this and leaves the PWA in portrait (iOS often does).
