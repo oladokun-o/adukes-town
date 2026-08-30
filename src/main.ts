@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { mountCityApp } from "@/city/mountCityApp";
 import { mountOnboarding } from "@/city/mountOnboarding";
+import { mountInstallGate } from "@/city/splash/mountInstallGate";
 import { mountSplash } from "@/city/splash/mountSplash";
 import type { ResolvedBoosterModifiers } from "@/game/city/catalog";
 import { loadCityStateFromDb } from "@/game/city/cityState";
@@ -13,7 +14,9 @@ import { Hud } from "@/hud/Hud";
 import { hasLocalAccount, loadAccountFromDb } from "@/save/account";
 import { pushToCloud } from "@/save/cloudSync";
 import { requestPersistentStorage } from "@/save/persist";
+import { initInstallCapture, isStandalone } from "@/pwa/installPrompt";
 import { loadInstallBannerDismissedFromDb } from "@/settings/installBanner";
+import { isInstallGateDismissed, loadInstallGateDismissedFromDb } from "@/settings/installGate";
 import { loadRelaxModeFromDb } from "@/settings/relaxMode";
 import {
   loadSplashStateFromDb,
@@ -30,12 +33,17 @@ import {
 // point of this project is no punishing dead ends, and a boot-time crash
 // over a missing save is the ultimate dead end. Falls back to an
 // unpersisted session instead.
+// `beforeinstallprompt` can fire before the first await resolves, so start
+// listening for it synchronously, before anything else.
+initInstallCapture();
+
 try {
   await Promise.all([
     loadProgressFromDb(levels.map((level) => level.id)),
     loadRelaxModeFromDb(),
     loadCityStateFromDb(),
     loadInstallBannerDismissedFromDb(),
+    loadInstallGateDismissedFromDb(),
     loadAccountFromDb(),
     loadSplashStateFromDb(),
   ]);
@@ -169,9 +177,26 @@ function boot(): void {
 
 // The intro sequence runs first: Nxtedge Studio sting, then — in her
 // birthday season, or the very first launch ever — a short personal card.
-// Tapping skips ahead; it always ends by handing off to boot().
+// Tapping skips ahead; it always ends by handing off to gateThenBoot().
 const splashEl = document.getElementById("splash");
 const showBirthday = shouldShowBirthdayCard(Date.now());
+
+// Between the splash and boot: unless the app is already installed (or she
+// has chosen "continue in browser" before), show the Add-to-Home-Screen gate
+// so the first real session runs full screen with durable storage.
+function gateThenBoot(): void {
+  if (!splashEl || isStandalone() || isInstallGateDismissed()) {
+    boot();
+    return;
+  }
+  const teardownGate = mountInstallGate(splashEl, {
+    onDone: () => {
+      teardownGate();
+      boot();
+    },
+  });
+}
+
 if (splashEl) {
   const teardownSplash = mountSplash(splashEl, {
     showBirthday,
@@ -180,7 +205,7 @@ if (splashEl) {
       if (showBirthday) {
         void markBirthdayCardShown();
       }
-      boot();
+      gateThenBoot();
     },
   });
 } else {
