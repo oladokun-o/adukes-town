@@ -630,8 +630,20 @@ export class TownScene extends Phaser.Scene {
     cam.centerOn(b.centerX, b.centerY);
   }
 
+  private pointersDown(): number {
+    return this.input.manager.pointers.filter((p) => p.isDown).length;
+  }
+
   private setupCameraDrag(): void {
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      // A second finger means a pinch is starting, not a pan. (On touch the
+      // active pointer is pointers[1+], not pointers[0] — the old guard
+      // checked pointers[1], which IS the first finger, so a one-finger drag
+      // always bailed and the town never panned on mobile.)
+      if (this.pointersDown() > 1) {
+        this.isDragging = false;
+        return;
+      }
       this.isDragging = true;
       this.dragStart = {
         x: pointer.x,
@@ -643,7 +655,10 @@ export class TownScene extends Phaser.Scene {
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
       if (!this.isDragging || !pointer.isDown) return;
-      if (this.input.manager.pointers[1]?.isDown) return;
+      if (this.pointersDown() > 1) {
+        this.isDragging = false;
+        return;
+      }
       this.cameras.main.scrollX = this.dragStart.scrollX - (pointer.x - this.dragStart.x);
       this.cameras.main.scrollY = this.dragStart.scrollY - (pointer.y - this.dragStart.y);
     });
@@ -662,16 +677,19 @@ export class TownScene extends Phaser.Scene {
       },
     );
 
-    this.input.addPointer(1);
+    // Two touch pointers on top of the mouse pointer, so a genuine two-finger
+    // pinch has two entries in the down list.
+    this.input.addPointer(2);
     let pinchStartDistance: number | null = null;
     let pinchStartZoom = 1;
 
     this.input.on("pointermove", () => {
-      const [p1, p2] = this.input.manager.pointers;
-      if (!p1.isDown || !p2.isDown) {
+      const down = this.input.manager.pointers.filter((p) => p.isDown);
+      if (down.length < 2) {
         pinchStartDistance = null;
         return;
       }
+      const [p1, p2] = down;
       const distance = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
       if (pinchStartDistance === null) {
         pinchStartDistance = distance;
