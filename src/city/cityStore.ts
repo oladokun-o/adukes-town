@@ -63,6 +63,25 @@ import { buyPicks, buySeed, sellItem } from "@/game/city/market";
 import { getCrop, getItem } from "@/game/city/catalog";
 import { getProfile } from "@/game/story";
 import { pushToast } from "@/city/toasts";
+import { emitGameEvent, GameEvents, type TownFxKind } from "@/game/events";
+import {
+  playBuildThunk,
+  playCoin,
+  playCollect,
+  playHarvest,
+  resumeAudioContext,
+} from "@/game/audio/juiceSounds";
+
+// A tile flourish + sound after an action lands. TownScene picks up the
+// event and animates at the matching sprite.
+function townFx(kind: TownFxKind, id: string, text?: string): void {
+  resumeAudioContext();
+  if (kind === "harvest") playHarvest();
+  else if (kind === "build") playBuildThunk();
+  else if (kind === "reward") playCoin();
+  else playCollect();
+  emitGameEvent(GameEvents.TownFx, { kind, id, text });
+}
 import type { CityState } from "@/game/city/types";
 import { xpIntoLevel } from "@/game/city/xp";
 
@@ -167,6 +186,7 @@ export function harvest(plotId: string): void {
       if (crop) {
         const item = getItem(crop.producesItemId);
         pushToast(`+${crop.yield} ${item?.name ?? "crop"}`, "reward", item?.icon ?? "🧺");
+        townFx("harvest", plotId, `+${crop.yield} ${item?.icon ?? "🌾"}`);
       }
     },
   );
@@ -179,7 +199,10 @@ export function queueRecipeAction(factoryId: string, recipeId: string): void {
 export function collectFactoryAction(factoryId: string): void {
   dispatch(
     (state, now) => collectFactory(state, factoryId, now),
-    () => pushToast("Goods collected", "reward", "📦"),
+    () => {
+      pushToast("Goods collected", "reward", "📦");
+      townFx("collect", factoryId, "📦");
+    },
   );
 }
 
@@ -190,14 +213,20 @@ export function feedPenAction(penId: string): void {
 export function collectPenAction(penId: string): void {
   dispatch(
     (state, now) => collectPen(state, penId, now),
-    () => pushToast("Animal produce collected", "reward", "🥚"),
+    () => {
+      pushToast("Animal produce collected", "reward", "🥚");
+      townFx("collect", penId, "🥚");
+    },
   );
 }
 
 export function fulfill(orderId: string): void {
   dispatch(
     (state) => fulfillOrder(state, orderId),
-    (before, after) => pushToast(`Order filled · +${coinDelta(before, after)} 🪙`, "reward", "🚁"),
+    (before, after) => {
+      pushToast(`Order filled · +${coinDelta(before, after)} 🪙`, "reward", "🚁");
+      townFx("reward", "order", `+${coinDelta(before, after)} 🪙`);
+    },
   );
 }
 
@@ -238,7 +267,10 @@ export function buyPlotAction(plotId: string): void {
 export function buildStructureAction(buildingId: string): void {
   dispatch(
     (state) => buildStructure(state, buildingId),
-    () => pushToast("New building raised", "reward", "🏗️"),
+    () => {
+      pushToast("New building raised", "reward", "🏗️");
+      townFx("build", "build");
+    },
   );
 }
 
@@ -277,6 +309,7 @@ export function digMineAction(): void {
     (before, after) => {
       const gotToken = after.tokens > before.tokens;
       pushToast(gotToken ? "A gem! +1 💠" : "Struck materials", "reward", gotToken ? "💎" : "⛏️");
+      townFx("collect", "mine", gotToken ? "💎" : "⛏️");
     },
   );
 }

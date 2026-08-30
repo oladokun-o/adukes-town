@@ -12,7 +12,14 @@ import {
 import { getCityState, onCityStateChange } from "@/game/city/cityState";
 import { cropStage } from "@/game/city/timers";
 import type { CityState } from "@/game/city/types";
-import { emitGameEvent, GameEvents, type TownTileKind } from "@/game/events";
+import {
+  emitGameEvent,
+  GameEvents,
+  offGameEvent,
+  onGameEvent,
+  type TownFxPayload,
+  type TownTileKind,
+} from "@/game/events";
 import { FARM_GRID_WIDTH } from "@/game/town/config";
 import {
   gridToScreen,
@@ -41,9 +48,6 @@ const T = {
   bHouse2: "town-b-house2",
   bHouse3: "town-b-house3",
   bBooth: "town-b-booth",
-  cropSprout: "town-crop-sprout",
-  cropGrowing: "town-crop-growing",
-  cropFull: "town-crop-full",
 } as const;
 
 const TEXTURE_FILES: Record<string, string> = {
@@ -59,9 +63,6 @@ const TEXTURE_FILES: Record<string, string> = {
   [T.bHouse2]: "iso/b-house2.png",
   [T.bHouse3]: "iso/b-house3.png",
   [T.bBooth]: "iso/b-booth.png",
-  [T.cropSprout]: "crop-sprout.png",
-  [T.cropGrowing]: "crop-growing.png",
-  [T.cropFull]: "crop-full.png",
 };
 
 // Vertical origin per texture: the fraction down the sprite where the tile's
@@ -90,9 +91,6 @@ const SCALE: Record<string, number> = {
   [T.bHouse]: 1.1,
   [T.bHouse2]: 1.1,
   [T.bHouse3]: 1.1,
-  [T.cropSprout]: 0.26,
-  [T.cropGrowing]: 0.26,
-  [T.cropFull]: 0.26,
 };
 
 const DRAG_THRESHOLD_PX = 6;
@@ -224,6 +222,12 @@ export class TownScene extends Phaser.Scene {
   private unsubscribeCityState: (() => void) | null = null;
   private objects: Phaser.GameObjects.GameObject[] = [];
   private tileBounds = new Phaser.Geom.Rectangle();
+  // Where each tappable tile is on screen + its main sprite, so a TownFx
+  // event can animate at the right spot after an action lands.
+  private fxTargets = new Map<
+    string,
+    { x: number; y: number; sprite: Phaser.GameObjects.GameObject }
+  >();
 
   private isDragging = false;
   private dragStart = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
@@ -251,12 +255,16 @@ export class TownScene extends Phaser.Scene {
       this.renderTown();
     });
 
+    const onFx = (p: TownFxPayload): void => this.playFx(p);
+    onGameEvent(GameEvents.TownFx, onFx);
+
     this.setupCameraDrag();
     this.setupCameraZoom();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribeCityState?.();
       this.unsubscribeCityState = null;
+      offGameEvent(GameEvents.TownFx, onFx);
     });
   }
 
@@ -303,6 +311,7 @@ export class TownScene extends Phaser.Scene {
   // Full redraw on every city-state change.
   private renderTown(): void {
     this.clearObjects();
+    this.fxTargets.clear();
     this.tileBounds.setEmpty();
 
     const buildings = buildingsFor(this.cityState);
@@ -317,11 +326,15 @@ export class TownScene extends Phaser.Scene {
 
     // 1) Ground — one grass slab with a darker south/east skirt for depth,
     // then a dirt patch sized to exactly the farm plots.
+    const gc0 = minC - 2;
+    const gr0 = minR - 2;
+    const gc1 = maxC + 2;
+    const gr1 = maxR + 2;
     const ground = this.add.graphics().setDepth(-500);
     ground.fillStyle(0x7fb457, 1);
-    ground.fillPoints(this.toPoints(this.isoQuad(minC - 3, minR - 3, maxC + 3, maxR + 3)), true);
+    ground.fillPoints(this.toPoints(this.isoQuad(gc0, gr0, gc1, gr1)), true);
     ground.fillStyle(0x5f9440, 1);
-    ground.fillPoints(this.toPoints(this.skirt(minC - 3, minR - 3, maxC + 3, maxR + 3)), true);
+    ground.fillPoints(this.toPoints(this.skirt(gc0, gr0, gc1, gr1)), true);
     if (plotCells.length > 0) {
       const fc0 = Math.min(...plotCells.map((c) => c.col));
       const fc1 = Math.max(...plotCells.map((c) => c.col));
@@ -332,14 +345,51 @@ export class TownScene extends Phaser.Scene {
     }
     this.objects.push(ground);
 
-    // 2) Farm plots.
+    // 2) A sparse ring of trees just outside the content, for a bit of life.
+    this.renderTrees(minC - 1, minR - 1, maxC + 1, maxR + 1);
+
+    // 3) Farm plots.
     for (const plot of this.cityState.plots) {
       const g = plotIdToGrid(plot.id);
       if (g) this.renderPlot(g, plot);
     }
 
-    // 3) Buildings.
+    // 4) Buildings.
     for (const b of buildings) this.renderBuilding(b);
+  }
+
+  // Deterministic scatter of simple drawn trees just inside the ground
+  // edge — never on a plot or building cell.
+  private renderTrees(c0: number, r0: number, c1: number, r1: number): void {
+    const occupied = new Set<string>();
+    for (const p of this.cityState.plots) {
+      const g = plotIdToGrid(p.id);
+      if (g) occupied.add(`${g.col},${g.row}`);
+    }
+    for (const b of buildingsFor(this.cityState)) {
+      occupied.add(`${Math.round(b.pos.col)},${Math.round(b.pos.row)}`);
+    }
+    const edge: GridPosition[] = [];
+    for (let c = c0; c <= c1; c++) edge.push({ col: c, row: r0 }, { col: c, row: r1 });
+    for (let r = r0 + 1; r < r1; r++) edge.push({ col: c0, row: r }, { col: c1, row: r });
+    for (const pos of edge) {
+      if (occupied.has(`${Math.round(pos.col)},${Math.round(pos.row)}`)) continue;
+      // deterministic ~40% keep rate
+      if ((pos.col * 7 + pos.row * 13 + 100) % 5 >= 2) continue;
+      this.drawTree(pos, ((pos.col * 11 + pos.row * 5) % 5) - 2);
+    }
+  }
+
+  private drawTree(pos: GridPosition, jitter: number): void {
+    const s = gridToScreen(pos);
+    const x = s.x + jitter * 5;
+    const y = s.y + jitter * 2;
+    const depth = this.isoDepth(pos, 5);
+    this.objects.push(this.add.ellipse(x, y + 1, 26, 12, 0x1c2a17, 0.16).setDepth(depth - 1));
+    const trunk = this.add.rectangle(x, y, 5, 12, 0x7a5230).setOrigin(0.5, 1).setDepth(depth);
+    const canopy = this.add.ellipse(x, y - 14, 30, 34, 0x4f8f43).setDepth(depth + 1);
+    const hi = this.add.ellipse(x - 4, y - 19, 15, 15, 0x6cae57).setDepth(depth + 2);
+    this.objects.push(trunk, canopy, hi);
   }
 
   private toPoints(flat: number[]): Phaser.Math.Vector2[] {
@@ -378,29 +428,50 @@ export class TownScene extends Phaser.Scene {
     g.input!.cursor = "pointer";
     g.on("pointerup", (pointer: Phaser.Input.Pointer) => {
       if (this.movedTooFar(pointer)) return;
+      this.bounce(g);
       emitGameEvent(GameEvents.TownTileTapped, { kind: "plot", id: plot.id });
     });
     this.objects.push(g);
     this.growBounds(pos);
 
+    const screen = gridToScreen(pos);
+    this.fxTargets.set(plot.id, { x: screen.x, y: screen.y - 6, sprite: g });
+
     if (!plot.unlocked) return;
     const stage = cropStage(plot.planting?.timer ?? null, Date.now());
-    const cropTex =
+    if (stage) this.drawCrop(pos, stage, depth + 1);
+  }
+
+  // Simple grown-in-Graphics crop rows so the style matches the flat-iso
+  // ground; three stages driven by cropStage().
+  private drawCrop(pos: GridPosition, stage: "sprout" | "growing" | "full", depth: number): void {
+    const s = gridToScreen(pos);
+    const g = this.add.graphics().setDepth(depth);
+    const rows = 3;
+    const cols = 3;
+    const [tuftH, colour, tip] =
       stage === "sprout"
-        ? T.cropSprout
+        ? [4, 0x6cae57, 0]
         : stage === "growing"
-          ? T.cropGrowing
-          : stage === "full"
-            ? T.cropFull
-            : null;
-    if (!cropTex) return;
-    const screen = gridToScreen(pos);
-    const crop = this.add.image(screen.x, screen.y - 2, cropTex);
-    crop
-      .setOrigin(0.5, 0.88)
-      .setScale(SCALE[cropTex])
-      .setDepth(depth + 1);
-    this.objects.push(crop);
+          ? [12, 0x5aa049, 0]
+          : [18, 0xc9b24a, 1];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const ox = (c - 1) * 22 + (r - 1) * 11;
+        const oy = (r - 1) * 11 - (c - 1) * 5;
+        const x = s.x + ox;
+        const y = s.y + oy + 4;
+        g.fillStyle(0x000000, 0.12);
+        g.fillEllipse(x, y + 1, 12, 5);
+        g.fillStyle(colour, 1);
+        g.fillRoundedRect(x - 4, y - tuftH, 8, tuftH, 3);
+        if (tip) {
+          g.fillStyle(0xe4d06a, 1);
+          g.fillCircle(x, y - tuftH, 3);
+        }
+      }
+    }
+    this.objects.push(g);
   }
 
   private renderBuilding(b: BuildingSpec): void {
@@ -418,15 +489,80 @@ export class TownScene extends Phaser.Scene {
     img.setInteractive({ useHandCursor: true, pixelPerfect: true });
     img.on("pointerup", (pointer: Phaser.Input.Pointer) => {
       if (this.movedTooFar(pointer)) return;
+      this.bounce(img);
       emitGameEvent(GameEvents.TownTileTapped, { kind: b.kind, id: b.id });
     });
     this.objects.push(img);
     Phaser.Geom.Rectangle.Union(this.tileBounds, img.getBounds(), this.tileBounds);
+    this.fxTargets.set(b.id, { x: screen.x, y: screen.y - 40, sprite: img });
 
     if (b.badge) {
       const badge = this.add.text(screen.x, screen.y - 70, b.badge, { fontSize: "30px" });
       badge.setOrigin(0.5, 1).setDepth(depth + 2);
       this.objects.push(badge);
+    }
+  }
+
+  // A quick squash-and-settle on any tapped or flourished tile.
+  private bounce(obj: Phaser.GameObjects.GameObject): void {
+    const scaled = obj as unknown as { scaleX?: number; scaleY?: number };
+    if (typeof scaled.scaleX !== "number" || typeof scaled.scaleY !== "number") return;
+    const bx = scaled.scaleX;
+    const by = scaled.scaleY;
+    this.tweens.add({
+      targets: obj,
+      scaleX: bx * 1.06,
+      scaleY: by * 0.94,
+      duration: 90,
+      yoyo: true,
+      ease: "Sine.easeOut",
+    });
+  }
+
+  // The reward flourish for `TownFx`: bounce the tile, float a label up,
+  // and (for harvest) a little burst of specks.
+  private playFx(p: TownFxPayload): void {
+    const target = this.fxTargets.get(p.id);
+    if (!target) return;
+    this.bounce(target.sprite);
+
+    if (p.text) {
+      const t = this.add
+        .text(target.x, target.y, p.text, {
+          fontFamily: "Fredoka, system-ui, sans-serif",
+          fontSize: "24px",
+          color: "#fff",
+          stroke: "#2f2519",
+          strokeThickness: 5,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(100_000);
+      this.tweens.add({
+        targets: t,
+        y: target.y - 60,
+        alpha: 0,
+        duration: 1100,
+        ease: "Cubic.easeOut",
+        onComplete: () => t.destroy(),
+      });
+    }
+
+    if (p.kind === "harvest" || p.kind === "collect") {
+      const tint = p.kind === "harvest" ? 0xffe08a : 0xbfe0ff;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const speck = this.add.circle(target.x, target.y, 4, tint).setDepth(100_000);
+        this.tweens.add({
+          targets: speck,
+          x: target.x + Math.cos(a) * 34,
+          y: target.y + Math.sin(a) * 20 - 14,
+          alpha: 0,
+          scale: 0.2,
+          duration: 550,
+          ease: "Cubic.easeOut",
+          onComplete: () => speck.destroy(),
+        });
+      }
     }
   }
 

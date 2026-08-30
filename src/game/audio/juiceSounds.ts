@@ -112,6 +112,51 @@ export function playBirthdayFlourish(): void {
   });
 }
 
+// --- City action SFX (Phase 9) --------------------------------------
+// Short, soft, distinct-per-action cues for the town view. Same synth
+// approach as the match-3 sounds — no audio files.
+
+export function playHarvest(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  [659.25, 880.0].forEach((f, i) =>
+    scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime + i * 0.05, f, 0.14, "sine", 0.3),
+  );
+}
+
+export function playCollect(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  [523.25, 698.46, 1046.5].forEach((f, i) =>
+    scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime + i * 0.06, f, 0.16, "sine", 0.26),
+  );
+}
+
+export function playCoin(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime, 988, 0.08, "triangle", 0.3);
+  scheduleTone(audio.ctx, audio.master, audio.ctx.currentTime + 0.06, 1319, 0.1, "triangle", 0.28);
+}
+
+export function playBuildThunk(): void {
+  const audio = getAudio();
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(70, t + 0.18);
+  gain.gain.setValueAtTime(0.34, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(t);
+  osc.stop(t + 0.24);
+}
+
 const CREATE_CHIME_NOTES = [523.25, 659.25, 783.99]; // C5, E5, G5
 
 export function playSpecialCreate(): void {

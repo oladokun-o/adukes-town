@@ -12,6 +12,7 @@ export const GameEvents = {
   LevelLose: "level:lose",
   PauseToggle: "pause:toggle",
   TownTileTapped: "town:tileTapped",
+  TownFx: "town:fx",
 } as const;
 
 export interface MovesChangedPayload {
@@ -56,6 +57,19 @@ export interface TownTileTappedPayload {
   id: string;
 }
 
+// A visual flourish to play at a town tile after an action lands — driven
+// from cityStore so TownScene stays unaware of the economy.
+export type TownFxKind = "harvest" | "collect" | "reward" | "build";
+
+export interface TownFxPayload {
+  kind: TownFxKind;
+  // A plot id, building id, or "building:<id>:<n>" — matched against the
+  // sprites TownScene drew on its last render.
+  id: string;
+  // Floating label, e.g. "+3 🌾".
+  text?: string;
+}
+
 interface GameEventPayloads {
   [GameEvents.MovesChanged]: MovesChangedPayload;
   [GameEvents.GoalProgress]: GoalProgressPayload;
@@ -63,6 +77,7 @@ interface GameEventPayloads {
   [GameEvents.LevelLose]: LevelLosePayload;
   [GameEvents.PauseToggle]: undefined;
   [GameEvents.TownTileTapped]: TownTileTappedPayload;
+  [GameEvents.TownFx]: TownFxPayload;
 }
 
 type EventArgs<K extends keyof GameEventPayloads> = GameEventPayloads[K] extends undefined
