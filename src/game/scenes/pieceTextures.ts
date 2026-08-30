@@ -19,97 +19,154 @@ export const PIECE_COLORS: Record<PieceType, number> = {
   Purple: 0x9b59b6,
 };
 
-// Distinct shapes per type so pieces read apart by silhouette, not just hue —
-// a cheap accessibility win with no art assets.
-const PIECE_SHAPES: Record<PieceType, (g: Phaser.GameObjects.Graphics, r: number) => void> = {
-  Red: (g, r) => g.fillCircle(r, r, r * 0.8),
-  Blue: (g, r) => g.fillRect(r * 0.25, r * 0.25, r * 1.5, r * 1.5),
-  Green: (g, r) => {
-    g.fillTriangle(r, r * 0.2, r * 1.8, r * 1.8, r * 0.2, r * 1.8);
+// Distinct filled shapes per type — pieces read apart by silhouette, not
+// just hue (a cheap accessibility win). Each draws centred on (cx, cy) with
+// half-extent `rad`, so the same routine can be re-run offset for a shadow.
+const PIECE_SHAPES: Record<
+  PieceType,
+  (g: Phaser.GameObjects.Graphics, cx: number, cy: number, rad: number) => void
+> = {
+  Red: (g, cx, cy, rad) => g.fillCircle(cx, cy, rad * 0.82),
+  Blue: (g, cx, cy, rad) => {
+    g.fillRoundedRect(cx - rad * 0.74, cy - rad * 0.74, rad * 1.48, rad * 1.48, rad * 0.28);
   },
-  Yellow: (g, r) => {
+  Green: (g, cx, cy, rad) => {
+    g.fillTriangle(
+      cx,
+      cy - rad * 0.86,
+      cx + rad * 0.86,
+      cy + rad * 0.72,
+      cx - rad * 0.86,
+      cy + rad * 0.72,
+    );
+  },
+  Yellow: (g, cx, cy, rad) => {
     g.fillPoints(
       [
-        new Phaser.Math.Vector2(r, r * 0.15),
-        new Phaser.Math.Vector2(r * 1.85, r),
-        new Phaser.Math.Vector2(r, r * 1.85),
-        new Phaser.Math.Vector2(r * 0.15, r),
+        new Phaser.Math.Vector2(cx, cy - rad * 0.92),
+        new Phaser.Math.Vector2(cx + rad * 0.92, cy),
+        new Phaser.Math.Vector2(cx, cy + rad * 0.92),
+        new Phaser.Math.Vector2(cx - rad * 0.92, cy),
       ],
       true,
     );
   },
-  Purple: (g, r) => {
+  Purple: (g, cx, cy, rad) => {
     const points: Phaser.Math.Vector2[] = [];
     const spikes = 5;
-    const outerRadius = r * 0.85;
-    const innerRadius = r * 0.4;
     for (let i = 0; i < spikes * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const radius = i % 2 === 0 ? rad * 0.92 : rad * 0.44;
       const angle = (Math.PI / spikes) * i - Math.PI / 2;
       points.push(
-        new Phaser.Math.Vector2(r + radius * Math.cos(angle), r + radius * Math.sin(angle)),
+        new Phaser.Math.Vector2(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)),
       );
     }
     g.fillPoints(points, true);
   },
 };
 
-// Two overlapping triangles pointing outward along the clear axis — reads as
-// a bar/arrow without needing real art.
-function drawRocket(g: Phaser.GameObjects.Graphics, r: number, axis: "row" | "col"): void {
-  g.fillStyle(0xecf0f1, 1);
-  if (axis === "row") {
-    g.fillTriangle(r * 0.1, r, r * 0.7, r * 0.25, r * 0.7, r * 1.75);
-    g.fillTriangle(r * 1.9, r, r * 1.3, r * 0.25, r * 1.3, r * 1.75);
-  } else {
-    g.fillTriangle(r, r * 0.1, r * 0.25, r * 0.7, r * 1.75, r * 0.7);
-    g.fillTriangle(r, r * 1.9, r * 0.25, r * 1.3, r * 1.75, r * 1.3);
-  }
+// Darker rim tint for a piece's colour (multiply toward black).
+function shade(colour: number, factor: number): number {
+  const c = Phaser.Display.Color.IntegerToColor(colour);
+  return Phaser.Display.Color.GetColor(
+    Math.round(c.red * factor),
+    Math.round(c.green * factor),
+    Math.round(c.blue * factor),
+  );
 }
 
-// Dark core with an explosion-spike ring — colorless so it doesn't read as
-// one of the five match colors.
-function drawBomb(g: Phaser.GameObjects.Graphics, r: number): void {
-  g.fillStyle(0x2c3e50, 1);
-  g.fillCircle(r, r, r * 0.75);
+// A basic piece: soft drop shadow, the colour shape, a darker rim, then a
+// glossy highlight — turns the flat shapes into little candies.
+function drawPiece(g: Phaser.GameObjects.Graphics, size: number, type: PieceType): void {
+  const c = size / 2;
+  const rad = size / 2;
+  const shape = PIECE_SHAPES[type];
 
+  g.fillStyle(0x000000, 0.13);
+  shape(g, c + size * 0.03, c + size * 0.045, rad);
+
+  g.fillStyle(shade(PIECE_COLORS[type], 0.7), 1);
+  shape(g, c, c, rad);
+
+  g.fillStyle(PIECE_COLORS[type], 1);
+  shape(g, c, c - size * 0.015, rad * 0.9);
+
+  g.fillStyle(0xffffff, 0.42);
+  g.fillEllipse(c - size * 0.14, c - size * 0.2, size * 0.34, size * 0.19);
+  g.fillStyle(0xffffff, 0.2);
+  g.fillCircle(c + size * 0.15, c + size * 0.13, size * 0.075);
+}
+
+// Two overlapping wedges along the clear axis — reads as a bar/arrow.
+function drawRocket(g: Phaser.GameObjects.Graphics, size: number, axis: "row" | "col"): void {
+  const c = size / 2;
+  const r = size / 2;
+  g.fillStyle(0x000000, 0.18);
+  g.fillCircle(c + size * 0.05, c + size * 0.07, r * 0.86);
+  g.fillStyle(0x37474f, 1);
+  g.fillCircle(c, c, r * 0.86);
+  g.fillStyle(0xeceff1, 1);
+  if (axis === "row") {
+    g.fillTriangle(c - r * 0.8, c, c - r * 0.1, c - r * 0.55, c - r * 0.1, c + r * 0.55);
+    g.fillTriangle(c + r * 0.8, c, c + r * 0.1, c - r * 0.55, c + r * 0.1, c + r * 0.55);
+  } else {
+    g.fillTriangle(c, c - r * 0.8, c - r * 0.55, c - r * 0.1, c + r * 0.55, c - r * 0.1);
+    g.fillTriangle(c, c + r * 0.8, c - r * 0.55, c + r * 0.1, c + r * 0.55, c + r * 0.1);
+  }
+  g.fillStyle(0xffffff, 0.35);
+  g.fillEllipse(c - size * 0.14, c - size * 0.2, size * 0.3, size * 0.16);
+}
+
+// Dark core with an explosion-spike ring — colourless so it doesn't read
+// as one of the five match colours.
+function drawBomb(g: Phaser.GameObjects.Graphics, size: number): void {
+  const c = size / 2;
+  const r = size / 2;
+  g.fillStyle(0x000000, 0.18);
+  g.fillCircle(c + size * 0.05, c + size * 0.07, r * 0.78);
   g.fillStyle(0xe67e22, 1);
-  const spikes = 8;
+  const spikes = 10;
   for (let i = 0; i < spikes; i++) {
     const angle = (Math.PI * 2 * i) / spikes;
-    const x1 = r + Math.cos(angle) * r * 0.75;
-    const y1 = r + Math.sin(angle) * r * 0.75;
-    const x2 = r + Math.cos(angle) * r * 1.15;
-    const y2 = r + Math.sin(angle) * r * 1.15;
-    const perpAngle = angle + Math.PI / 2;
-    const wx = Math.cos(perpAngle) * r * 0.12;
-    const wy = Math.sin(perpAngle) * r * 0.12;
+    const x1 = c + Math.cos(angle) * r * 0.7;
+    const y1 = c + Math.sin(angle) * r * 0.7;
+    const x2 = c + Math.cos(angle) * r * 1.05;
+    const y2 = c + Math.sin(angle) * r * 1.05;
+    const p = angle + Math.PI / 2;
+    const wx = Math.cos(p) * r * 0.14;
+    const wy = Math.sin(p) * r * 0.14;
     g.fillTriangle(x1 - wx, y1 - wy, x1 + wx, y1 + wy, x2, y2);
   }
+  g.fillStyle(0x2c3e50, 1);
+  g.fillCircle(c, c, r * 0.7);
+  g.fillStyle(0xffffff, 0.28);
+  g.fillEllipse(c - size * 0.12, c - size * 0.16, size * 0.28, size * 0.16);
 }
 
-// A wedge per match color, so it visually carries "clears one of every
-// color" without needing a literal rainbow gradient.
-function drawRainbowBall(g: Phaser.GameObjects.Graphics, r: number): void {
+// A wedge per match colour — carries "clears one of every colour" without a
+// literal rainbow gradient.
+function drawRainbowBall(g: Phaser.GameObjects.Graphics, size: number): void {
+  const c = size / 2;
+  const r = size / 2;
+  g.fillStyle(0x000000, 0.18);
+  g.fillCircle(c + size * 0.05, c + size * 0.07, r * 0.86);
   const colors = PIECE_TYPES.map((type) => PIECE_COLORS[type]);
-  const slices = colors.length;
-  for (let i = 0; i < slices; i++) {
-    const startAngle = (Math.PI * 2 * i) / slices - Math.PI / 2;
-    const endAngle = (Math.PI * 2 * (i + 1)) / slices - Math.PI / 2;
+  for (let i = 0; i < colors.length; i++) {
+    const startAngle = (Math.PI * 2 * i) / colors.length - Math.PI / 2;
+    const endAngle = (Math.PI * 2 * (i + 1)) / colors.length - Math.PI / 2;
     g.fillStyle(colors[i], 1);
     g.beginPath();
-    g.moveTo(r, r);
-    g.arc(r, r, r * 0.85, startAngle, endAngle);
+    g.moveTo(c, c);
+    g.arc(c, c, r * 0.86, startAngle, endAngle);
     g.closePath();
     g.fillPath();
   }
+  g.fillStyle(0xffffff, 0.35);
+  g.fillEllipse(c - size * 0.14, c - size * 0.2, size * 0.34, size * 0.2);
 }
 
 export const PARTICLE_TEXTURE_KEY = "particle-dot";
 
-// A single small white circle, tinted per piece color at explode time
-// (ParticleEmitter.setParticleTint) rather than generating one texture per
-// color — cheaper and keeps the "no art assets" approach consistent.
 export function ensureParticleTexture(scene: Phaser.Scene, size: number): void {
   if (scene.textures.exists(PARTICLE_TEXTURE_KEY)) return;
   const graphics = scene.add.graphics();
@@ -119,32 +176,29 @@ export function ensureParticleTexture(scene: Phaser.Scene, size: number): void {
   graphics.destroy();
 }
 
-// Generated once per size and cached on the texture manager so re-entering
-// BoardScene (or any future scene) doesn't regenerate them.
+// Generated once per size and cached on the texture manager.
 export function ensurePieceTextures(scene: Phaser.Scene, size: number): void {
   for (const type of PIECE_TYPES) {
     const key = `piece-${type}`;
     if (scene.textures.exists(key)) continue;
-
-    const graphics = scene.add.graphics();
-    graphics.fillStyle(PIECE_COLORS[type], 1);
-    PIECE_SHAPES[type](graphics, size / 2);
-    graphics.generateTexture(key, size, size);
-    graphics.destroy();
+    const g = scene.add.graphics();
+    drawPiece(g, size, type);
+    g.generateTexture(key, size, size);
+    g.destroy();
   }
 
-  const specialDrawers: Record<string, (g: Phaser.GameObjects.Graphics, r: number) => void> = {
-    "special-Rocket-row": (g, r) => drawRocket(g, r, "row"),
-    "special-Rocket-col": (g, r) => drawRocket(g, r, "col"),
+  const specialDrawers: Record<string, (g: Phaser.GameObjects.Graphics, s: number) => void> = {
+    "special-Rocket-row": (g, s) => drawRocket(g, s, "row"),
+    "special-Rocket-col": (g, s) => drawRocket(g, s, "col"),
     "special-Bomb": drawBomb,
     "special-RainbowBall": drawRainbowBall,
   };
 
   for (const [key, draw] of Object.entries(specialDrawers)) {
     if (scene.textures.exists(key)) continue;
-    const graphics = scene.add.graphics();
-    draw(graphics, size / 2);
-    graphics.generateTexture(key, size, size);
-    graphics.destroy();
+    const g = scene.add.graphics();
+    draw(g, size);
+    g.generateTexture(key, size, size);
+    g.destroy();
   }
 }

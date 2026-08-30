@@ -30,10 +30,10 @@ import {
 } from "@/game/scenes/pieceTextures";
 import { applyRelaxMode, isRelaxModeEnabled } from "@/settings/relaxMode";
 
-const PIECE_TEXTURE_SIZE = 128;
+const PIECE_TEXTURE_SIZE = 160;
 const PARTICLE_TEXTURE_SIZE = 16;
-const BOARD_MARGIN = 0.9;
-const PIECE_SCALE = 0.86;
+const BOARD_MARGIN = 0.86;
+const PIECE_SCALE = 0.9;
 const SWAP_DURATION_MS = 150;
 const CLEAR_DURATION_MS = 150;
 const SPECIAL_CLEAR_DURATION_MS = 320;
@@ -120,6 +120,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.drawScenery();
     ensurePieceTextures(this, PIECE_TEXTURE_SIZE);
     ensureParticleTexture(this, PARTICLE_TEXTURE_SIZE);
     this.particles = this.add.particles(0, 0, PARTICLE_TEXTURE_KEY, {
@@ -136,6 +137,7 @@ export class BoardScene extends Phaser.Scene {
     this.applyStartingSpecials();
 
     this.computeLayout();
+    this.drawBoardTray();
     this.renderFullBoard(false);
 
     this.input.on("pointerdown", this.onPointerDown, this);
@@ -188,6 +190,56 @@ export class BoardScene extends Phaser.Scene {
       targets: this.level.goal.targets,
       progress: this.goalProgress,
     });
+  }
+
+  // A warm focused backdrop — deep plum gradient with a soft glow behind
+  // where the board will sit — so the pieces read as candy on a table
+  // rather than shapes on a void. Pinned to the camera; drawn once.
+  private drawScenery(): void {
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    const bg = this.add.graphics().setScrollFactor(0).setDepth(-1000);
+    bg.fillGradientStyle(0x4a3357, 0x4a3357, 0x271b31, 0x271b31, 1);
+    bg.fillRect(0, 0, w, h);
+    bg.fillStyle(0xffe9c7, 0.12);
+    bg.fillCircle(w / 2, h / 2, Math.min(w, h) * 0.55);
+    bg.fillStyle(0x000000, 0.22);
+    bg.fillCircle(w / 2, h * 1.15, w * 0.9);
+  }
+
+  // The board tray: a rounded cream panel with a checkered set of cell
+  // sockets, behind the pieces.
+  private drawBoardTray(): void {
+    const bw = this.cellSize * this.level.width;
+    const bh = this.cellSize * this.level.height;
+    const pad = Math.round(this.cellSize * 0.34);
+    const x = this.originX - pad;
+    const y = this.originY - pad;
+    const w = bw + pad * 2;
+    const h = bh + pad * 2;
+
+    const tray = this.add.graphics().setDepth(-20);
+    tray.fillStyle(0x000000, 0.28);
+    tray.fillRoundedRect(x + 6, y + 12, w, h, 26);
+    tray.fillStyle(0xcbac82, 1);
+    tray.fillRoundedRect(x, y, w, h, 26);
+    tray.fillStyle(0xf5e7cd, 1);
+    tray.fillRoundedRect(x + 6, y + 6, w - 12, h - 12, 20);
+
+    const sockets = this.add.graphics().setDepth(-15);
+    const inset = Math.round(this.cellSize * 0.08);
+    for (let row = 0; row < this.level.height; row++) {
+      for (let col = 0; col < this.level.width; col++) {
+        sockets.fillStyle((row + col) % 2 === 0 ? 0xe9d5b4 : 0xe1c9a3, 1);
+        sockets.fillRoundedRect(
+          this.originX + col * this.cellSize + inset,
+          this.originY + row * this.cellSize + inset,
+          this.cellSize - inset * 2,
+          this.cellSize - inset * 2,
+          Math.round(this.cellSize * 0.22),
+        );
+      }
+    }
   }
 
   private computeLayout(): void {
